@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INCLINE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; overflow: hidden; font-family: 'Press Start 2P', monospace; color: #0f0; user-select: none; }
+  canvas { display: block; }
+  #ui { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 10; }
+  #score-val { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 28px; color: #0f0; text-shadow: 0 0 10px rgba(0,255,0,0.7); }
+  #section-label { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); font-size: 9px; color: rgba(0,255,0,0.35); letter-spacing: 2px; }
+  .screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; background: #000; pointer-events: all; }
+  .screen.hidden { opacity: 0; pointer-events: none; transition: opacity 0.4s; }
+  .screen.hide { display: none; }
+  .screen.show { display: flex; }
+  .screen h1 { font-size: 56px; color: #0f0; text-shadow: 0 0 30px rgba(0,255,0,0.5); margin-bottom: 40px; letter-spacing: 10px; }
+  .screen h2 { font-size: 32px; color: #f22; text-shadow: 0 0 20px rgba(255,34,34,0.5); margin-bottom: 28px; letter-spacing: 5px; }
+  .btn { font-family: 'Press Start 2P', monospace; font-size: 14px; padding: 12px 36px; border: 2px solid #0f0; background: transparent; color: #0f0; cursor: pointer; letter-spacing: 2px; transition: all 0.2s; pointer-events: all; }
+  .btn:hover { background: #0f0; color: #000; box-shadow: 0 0 20px rgba(0,255,0,0.4); }
+  #hi { margin-top: 18px; font-size: 10px; color: rgba(0,255,0,0.35); }
+  #hint { position: absolute; bottom: 32px; font-size: 8px; color: rgba(0,255,0,0.2); letter-spacing: 2px; }
+  #fs { font-size: 44px; color: #0f0; text-shadow: 0 0 12px rgba(0,255,0,0.5); margin-bottom: 6px; }
+  #fl { font-size: 9px; color: rgba(0,255,0,0.35); letter-spacing: 3px; margin-bottom: 36px; }
+  #nb { font-size: 12px; color: #0f0; margin-bottom: 24px; display: none; animation: p 0.8s infinite; }
+  @keyframes p { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  @media(max-width:600px){ .screen h1{font-size:32px} #score-val{font-size:20px} }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div id="score-val">0</div>
+  <div id="section-label"></div>
+</div>
+<div class="screen" id="ss">
+  <h1>INCLINE</h1>
+  <button class="btn" id="play-btn">PLAY</button>
+  <div id="hi"></div>
+  <div id="hint">A / D OR ← → TO STEER</div>
+</div>
+<div class="screen hide" id="os">
+  <h2>GAME OVER</h2>
+  <div id="fs">0</div>
+  <div id="fl">SCORE</div>
+  <div id="nb">★ NEW BEST ★</div>
+  <button class="btn" id="re-btn">RETRY</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+const G = 0x00ff00, DG = 0x003300, R = 0xdd2222, DR = 0x440000;
+
+const CFG = {
+  tw: 7,            // track width
+  ballR: 0.5,
+  gravity: 28,
+  baseSpd: 22,
+  maxSpd: 60,
+  spdUp: 0.5,
+  steer: 65,
+  damp: 0.85,
+  platLen: 14,      // standard platform length
+  platGap: 5,       // gap between platforms (drop)
+};
+
+let scene, cam, ren, ball;
+let bvx=0, bvy=0, bpx=0, bpy=0;
+let score=0, hiScore=0, speed=0, dist=0;
+let running=false, dead=false;
+let keys={l:false,r:false};
+let lastT=0, shake=0;
+let platforms=[], activeObs=[], bgBuilds=[];
+let genZ=0; // next Z position to generate at
+let sectionNum=0;
+
+const sEl=document.getElementById('score-val');
+const secEl=document.getElementById('section-label');
+const ssEl=document.getElementById('ss');
+const osEl=document.getElementById('os');
+const fsEl=document.getElementById('fs');
+const hiEl=document.getElementById('hi');
+const nbEl=document.getElementById('nb');
+
+try{hiScore=parseInt(localStorage.getItem('incline_hi')||'0')}catch(e){}
+if(hiScore>0) hiEl.textContent='BEST: '+hiScore;
+
+// =========== MATERIALS ===========
+const gWire = (op=0.12) => new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:op});
+const gLine = (op=0.5) => new THREE.LineBasicMaterial({color:G, transparent:true, opacity:op});
+const rSolid = (op=0.6) => new THREE.MeshBasicMaterial({color:DR, transparent:true, opacity:op});
+const rWire = () => new THREE.MeshBasicMaterial({color:R, wireframe:true});
+
+function makeRedBlock(w,h,d){
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(w,h,d), rSolid()));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(w,h,d,2,2,2), rWire()));
+  return g;
+}
+
+// =========== INIT ===========
+function init(){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x000000);
+  scene.fog = new THREE.FogExp2(0x000000, 0.012);
+  cam = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 300);
+  ren = new THREE.WebGLRenderer({antialias:true});
+  ren.setSize(innerWidth, innerHeight);
+  ren.setPixelRatio(Math.min(devicePixelRatio,2));
+  document.body.insertBefore(ren.domElement, document.body.firstChild);
+
+  const ballGeo = new THREE.SphereGeometry(CFG.ballR, 12, 8);
+  ball = new THREE.Mesh(ballGeo, new THREE.MeshBasicMaterial({color:G, wireframe:true}));
+  const inner = new THREE.Mesh(new THREE.SphereGeometry(CFG.ballR*0.55,8,6), new THREE.MeshBasicMaterial({color:G,transparent:true,opacity:0.2}));
+  ball.add(inner);
+  scene.add(ball);
+
+  // BG city
+  const bm = new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:0.1});
+  for(let s=-1;s<=1;s+=2){
+    for(let i=0;i<30;i++){
+      const w=2+Math.random()*5, h=4+Math.random()*20, d=2+Math.random()*5;
+      const b = new THREE.Mesh(new THREE.BoxGeometry(w,h,d,2,Math.floor(h/2),2), bm);
+      b.position.set(s*(CFG.tw/2+8+Math.random()*22), h/2-2, -i*18-Math.random()*12);
+      scene.add(b);
+      bgBuilds.push(b);
+    }
+  }
+}
+
+// =========== PLATFORM BUILDER ===========
+function makePlatform(z, length, width, opts={}){
+  const grp = new THREE.Group();
+  grp.position.z = z;
+  const hw = width/2;
+  const hl = length/2;
+  const fy = -CFG.ballR - 0.15;
+
+  // Floor grid
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, length, Math.max(2,Math.floor(width)), Math.max(2,Math.floor(length/3))),
+    gWire(opts.thin ? 0.18 : 0.12)
+  );
+  floor.rotation.x = -Math.PI/2;
+  floor.position.y = fy;
+  grp.add(floor);
+
+  // Edge lines
+  const ePts = [new THREE.Vector3(0,0,-hl), new THREE.Vector3(0,0,hl)];
+  const eGeo = new THREE.BufferGeometry().setFromPoints(ePts);
+  for(let s=-1;s<=1;s+=2){
+    const e = new THREE.Line(eGeo, gLine(0.7));
+    e.position.set(s*hw, fy+0.01, 0);
+    grp.add(e);
+  }
+
+  // Side walls with cross-hatch
+  if(!opts.noWalls){
+    const wh = 3;
+    for(let s=-1;s<=1;s+=2){
+      const wall = new THREE.Mesh(new THREE.PlaneGeometry(wh, length, 2, 3), gWire(0.06));
+      wall.rotation.y = s*Math.PI/2;
+      wall.position.set(s*hw, fy+wh/2, 0);
+      grp.add(wall);
+      // Diagonals
+      const dm = gLine(0.2);
+      [[fy,-hl, fy+wh,hl], [fy+wh,-hl, fy,hl]].forEach(([y1,z1,y2,z2])=>{
+        const pts=[new THREE.Vector3(s*hw,y1,z1), new THREE.Vector3(s*hw,y2,z2)];
+        grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), dm));
+      });
+    }
+  }
+
+  grp.userData = {z, length, width, fy, slantDir: opts.slantDir||0, isTunnel: opts.isTunnel||false};
+  scene.add(grp);
+  platforms.push(grp);
+  return grp;
+}
+
+// =========== OBSTACLE GENERATORS ===========
+
+function genRNGBlock(z){
+  const len = 18;
+  const p = makePlatform(z - len/2, len, CFG.tw);
+  const bw=1.4, bh=1.2, bd=1.4;
+  const maxX = CFG.tw/2 - bw/2 - CFG.tw/6;
+  const minX = -CFG.tw/2 + bw/2 + 0.3;
+  const xPos = minX + Math.random()*(maxX - minX);
+  const block = makeRedBlock(bw, bh, bd);
+  block.position.set(xPos, p.userData.fy + 0.15 + bh/2, 0);
+  p.add(block);
+  activeObs.push({mesh:block, parent:p, hw:bw/2+CFG.ballR*0.6, hh:bh/2+CFG.ballR*0.4, hd:bd/2+CFG.ballR*0.6, moving:false});
+  return len;
+}
+
+function genSlant(z){
+  // Wide platform visually and physically tilted to one side
+  const len = 18;
+  const dir = Math.random()<0.5 ? -1 : 1;
+  const w = CFG.tw * 1.05; // only slightly wider than normal track
+  const tiltHeight = 1.2; // how much higher one side is
+  const fy = -CFG.ballR - 0.15;
+
+  const grp = new THREE.Group();
+  grp.position.z = z - len/2;
+  const hw = w/2, hl = len/2;
+
+  // Build a tilted floor using custom buffer geometry (quad with different Y on each side)
+  const vertices = new Float32Array([
+    -hw, fy + (dir<0 ? tiltHeight : 0), -hl,
+     hw, fy + (dir>0 ? tiltHeight : 0), -hl,
+     hw, fy + (dir>0 ? tiltHeight : 0),  hl,
+    -hw, fy + (dir<0 ? tiltHeight : 0),  hl,
+  ]);
+  const indices = [0,1,2, 0,2,3];
+  const floorGeo = new THREE.BufferGeometry();
+  floorGeo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+  floorGeo.setIndex(indices);
+  const floorMesh = new THREE.Mesh(floorGeo, new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:0.25}));
+  grp.add(floorMesh);
+
+  // Grid lines across the tilted surface for that wireframe look
+  const gridMat = gLine(0.15);
+  for(let gz = -hl; gz <= hl; gz += 3){
+    const ly1 = fy + (dir<0 ? tiltHeight : 0);
+    const ly2 = fy + (dir>0 ? tiltHeight : 0);
+    const pts = [new THREE.Vector3(-hw, ly1, gz), new THREE.Vector3(hw, ly2, gz)];
+    grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gridMat));
+  }
+  for(let gx = -hw; gx <= hw; gx += 1.5){
+    const frac = (gx + hw) / w; // 0 to 1
+    const yAtX = fy + (dir<0 ? tiltHeight*(1-frac) : tiltHeight*frac);
+    const pts = [new THREE.Vector3(gx, yAtX, -hl), new THREE.Vector3(gx, yAtX, hl)];
+    grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gridMat));
+  }
+
+  // Bright edge lines
+  const highY = fy + tiltHeight;
+  const lowY = fy;
+  grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-dir*hw, highY, -hl), new THREE.Vector3(-dir*hw, highY, hl)
+  ]), gLine(0.7)));
+  grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(dir*hw, lowY, -hl), new THREE.Vector3(dir*hw, lowY, hl)
+  ]), gLine(0.4)));
+
+  // Wall on high side
+  const wallH = 1.2;
+  const highWall = new THREE.Mesh(
+    new THREE.BoxGeometry(0.3, wallH, len, 1, 2, 3),
+    new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:0.3})
+  );
+  highWall.position.set(-dir * hw, highY + wallH/2, 0);
+  grp.add(highWall);
+
+  grp.userData = {z: z - len/2, length: len, width: w, fy, slantDir: dir, tiltHeight, isTunnel: false};
+  scene.add(grp);
+  platforms.push(grp);
+  return len;
+}
+
+function genStraight(z){
+  // Long, narrow platform with end ramp
+  const len = 45;
+  const w = CFG.tw * 0.32;
+  const p = makePlatform(z - len/2, len, w, {thin:true, noWalls:true});
+  const fy = p.userData.fy;
+  const ramp = new THREE.Mesh(
+    new THREE.BoxGeometry(w*0.9, 0.15, 2.5),
+    new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:0.35})
+  );
+  ramp.position.set(0, fy+0.4, -len/2+2);
+  ramp.rotation.x = 0.2;
+  p.add(ramp);
+  return len;
+}
+
+function genTreblocks(z){
+  // Long platform with 3 weaving block sets: edge pair -> center block -> edge pair
+  // Each set is well spaced so player has time to weave
+  const len = 48;
+  const p = makePlatform(z - len/2, len, CFG.tw);
+  const fy = p.userData.fy;
+  const bw=1.2, bh=1.2, bd=1.3;
+  const hw = CFG.tw/2;
+  // Random horizontal offset for variety
+  const offset = (Math.random()-0.5)*1.5;
+
+  // First edge pair
+  const z1 = len/2 - 5;
+  for(let s=-1;s<=1;s+=2){
+    const blk = makeRedBlock(bw, bh, bd);
+    blk.position.set(s*(hw - bw/2 - 0.2) + offset, fy+0.15+bh/2, z1);
+    p.add(blk);
+    activeObs.push({mesh:blk, parent:p, hw:bw/2+CFG.ballR*0.6, hh:bh/2+CFG.ballR*0.4, hd:bd/2+CFG.ballR*0.6, moving:false});
+  }
+  // Center block
+  const z2 = z1 - 12;
+  const cblk = makeRedBlock(bw*1.8, bh, bd*1.3);
+  cblk.position.set(0 + offset, fy+0.15+bh/2, z2);
+  p.add(cblk);
+  activeObs.push({mesh:cblk, parent:p, hw:bw*0.9+CFG.ballR*0.6, hh:bh/2+CFG.ballR*0.4, hd:bd*0.65+CFG.ballR*0.6, moving:false});
+  // Second edge pair (further back)
+  const z3 = z2 - 14;
+  for(let s=-1;s<=1;s+=2){
+    const blk = makeRedBlock(bw, bh, bd);
+    blk.position.set(s*(hw - bw/2 - 0.2) + offset, fy+0.15+bh/2, z3);
+    p.add(blk);
+    activeObs.push({mesh:blk, parent:p, hw:bw/2+CFG.ballR*0.6, hh:bh/2+CFG.ballR*0.4, hd:bd/2+CFG.ballR*0.6, moving:false});
+  }
+  return len;
+}
+
+function genTunnel(z){
+  // Arched tunnel - blocks on sides and top forming a passage
+  const len = 22;
+  const p = makePlatform(z - len/2, len, CFG.tw, {isTunnel:true});
+  const fy = p.userData.fy;
+  const hw = CFG.tw/2;
+  const wallH = 2.5, wallW = 1.0;
+  const roofH = 0.6;
+  const passW = CFG.tw - wallW*2;
+
+  // Left and right tunnel walls
+  for(let s=-1;s<=1;s+=2){
+    const wall = makeRedBlock(wallW, wallH, len-2);
+    wall.position.set(s*(hw - wallW/2), fy + 0.15 + wallH/2, 0);
+    p.add(wall);
+    activeObs.push({mesh:wall, parent:p, hw:wallW/2+CFG.ballR*0.5, hh:wallH/2+CFG.ballR*0.3, hd:len/2-1+CFG.ballR*0.3, moving:false});
+  }
+  // Roof
+  const roof = makeRedBlock(CFG.tw, roofH, len-2);
+  roof.position.set(0, fy + 0.15 + wallH + roofH/2, 0);
+  p.add(roof);
+  activeObs.push({mesh:roof, parent:p, hw:CFG.tw/2+CFG.ballR*0.3, hh:roofH/2+CFG.ballR*0.3, hd:len/2-1+CFG.ballR*0.3, moving:false});
+
+  return len;
+}
+
+function genSnake(z){
+  // Smooth continuous curving narrow path using a sine wave
+  const totalLen = 50;
+  const w = CFG.tw * 0.35;
+  const hw = w/2;
+  const fy = -CFG.ballR - 0.15;
+  const steps = 60; // high segment count for smooth curve
+  const amplitude = 2.2;
+  const frequency = 2.5;
+
+  const grp = new THREE.Group();
+  grp.position.z = z - totalLen/2;
+
+  // Generate smooth curve points with perpendicular normals
+  const pts = [];
+  for(let i = 0; i <= steps; i++){
+    const frac = i / steps;
+    const pz = totalLen/2 - frac * totalLen;
+    const px = Math.sin(frac * Math.PI * frequency) * amplitude;
+    // Tangent for perpendicular calculation
+    const df = 0.001;
+    const px2 = Math.sin((frac+df) * Math.PI * frequency) * amplitude;
+    const pz2 = totalLen/2 - (frac+df) * totalLen;
+    const dx = px2 - px, dz = pz2 - pz;
+    const len = Math.sqrt(dx*dx + dz*dz);
+    // Perpendicular (rotated 90 degrees)
+    const nx = -dz/len * hw;
+    const nz = dx/len * hw;
+    pts.push({x:px, z:pz, nx, nz});
+  }
+
+  // Build one continuous floor mesh (solid, not wireframe, so no triangle edges)
+  const verts = [];
+  const indices = [];
+  for(let i = 0; i <= steps; i++){
+    const p = pts[i];
+    // Left edge vertex
+    verts.push(p.x - p.nx, fy, p.z - p.nz);
+    // Right edge vertex
+    verts.push(p.x + p.nx, fy, p.z + p.nz);
+    if(i < steps){
+      const bi = i*2;
+      indices.push(bi, bi+1, bi+3, bi, bi+3, bi+2);
+    }
+  }
+  const floorGeo = new THREE.BufferGeometry();
+  floorGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+  floorGeo.setIndex(indices);
+  const floorMat = new THREE.MeshBasicMaterial({color:G, transparent:true, opacity:0.08, side:THREE.DoubleSide});
+  grp.add(new THREE.Mesh(floorGeo, floorMat));
+
+  // Smooth edge lines (left and right) - the main visual
+  const leftPts = [], rightPts = [];
+  for(const p of pts){
+    leftPts.push(new THREE.Vector3(p.x - p.nx, fy+0.01, p.z - p.nz));
+    rightPts.push(new THREE.Vector3(p.x + p.nx, fy+0.01, p.z + p.nz));
+  }
+  const edgeMat = new THREE.LineBasicMaterial({color:G, transparent:true, opacity:0.6});
+  grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(leftPts), edgeMat));
+  grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(rightPts), edgeMat));
+
+  // Center line (subtle)
+  const centerPts = pts.map(p => new THREE.Vector3(p.x, fy+0.01, p.z));
+  grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(centerPts),
+    new THREE.LineBasicMaterial({color:G, transparent:true, opacity:0.1})));
+
+  // Cross lines every few steps for grid texture
+  const crossMat = new THREE.LineBasicMaterial({color:G, transparent:true, opacity:0.15});
+  for(let i = 0; i <= steps; i += 4){
+    const p = pts[i];
+    grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(p.x - p.nx, fy+0.01, p.z - p.nz),
+      new THREE.Vector3(p.x + p.nx, fy+0.01, p.z + p.nz),
+    ]), crossMat));
+  }
+
+  // Small ramp at the end
+  const last = pts[pts.length-1];
+  const ramp = new THREE.Mesh(
+    new THREE.BoxGeometry(w*0.85, 0.15, 2.5),
+    new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:0.35})
+  );
+  ramp.position.set(last.x, fy+0.4, last.z+1.2);
+  ramp.rotation.x = 0.2;
+  grp.add(ramp);
+
+  grp.userData = {
+    z: z - totalLen/2, length: totalLen, width: w,
+    fy, slantDir: 0, isTunnel: false,
+    isSnake: true, snakeHW: hw, snakeAmplitude: amplitude
+  };
+  scene.add(grp);
+  platforms.push(grp);
+  return totalLen;
+}
+
+function genHors(z){
+  // Short platform with a large block moving side to side
+  const len = 16;
+  const p = makePlatform(z - len/2, len, CFG.tw);
+  const fy = p.userData.fy;
+  const bw=2.0, bh=1.4, bd=1.6;
+  const block = makeRedBlock(bw, bh, bd);
+  const startX = -CFG.tw/2 + bw/2 + 0.3;
+  block.position.set(startX, fy+0.15+bh/2, 0);
+  p.add(block);
+  const obs = {
+    mesh:block, parent:p,
+    hw:bw/2+CFG.ballR*0.6, hh:bh/2+CFG.ballR*0.4, hd:bd/2+CFG.ballR*0.6,
+    moving:true, type:'hor',
+    dir:1, spd: (CFG.tw - bw - 0.6) / 3, // crosses in 3 seconds
+    minX: -CFG.tw/2 + bw/2 + 0.3,
+    maxX: CFG.tw/2 - bw/2 - 0.3,
+    delay: Math.random()*3, born: performance.now()/1000,
+  };
+  activeObs.push(obs);
+  return len;
+}
+
+function genVerts(z){
+  // Platform with 3 tall blocks that move up and down
+  const len = 20;
+  const p = makePlatform(z - len/2, len, CFG.tw);
+  const fy = p.userData.fy;
+  const bw = CFG.tw/3 - 0.3, bh=2.8, bd=2.0;
+  const now = performance.now()/1000;
+
+  for(let i=0; i<3; i++){
+    const block = makeRedBlock(bw, bh, bd);
+    const xPos = (i-1)*(CFG.tw/3);
+    block.position.set(xPos, fy+0.15+bh/2, 0);
+    p.add(block);
+    // Left starts immediately, middle after 3s, right after 6s
+    const delays = [0, 3, 6];
+    activeObs.push({
+      mesh:block, parent:p,
+      hw:bw/2+CFG.ballR*0.5, hh:bh/2+CFG.ballR*0.4, hd:bd/2+CFG.ballR*0.5,
+      moving:true, type:'vert',
+      baseY: fy+0.15+bh/2,
+      amplitude: 5.0,
+      period: 4, // 2s up + 2s down
+      delay: delays[i],
+      born: now,
+    });
+  }
+  return len;
+}
+
+function genSpeedtunnel(z){
+  // Tunnel with speed boost, side ramps that slope upward in the forward direction
+  const len = 22;
+  const p = makePlatform(z - len/2, len, CFG.tw);
+  const fy = p.userData.fy;
+  const hw = CFG.tw/2;
+  const rampW = 1.6;
+  const rampH = 5.5; // ramp goes well above the red arch
+  const tunnelLen = len - 2;
+  const hl = tunnelLen/2;
+
+  // Side ramps - floor on each side that ramps UP in the forward (-Z) direction
+  for(let s=-1;s<=1;s+=2){
+    // The ramp surface: flat at the entrance (back), rises at the exit (front)
+    // Back = +Z side (where ball enters), Front = -Z side (where ball exits)
+    const rampVerts = new Float32Array([
+      // back-inner (low)
+      s*(hw-0.3), fy+0.15, hl,
+      // back-outer (low)
+      s*(hw+rampW), fy+0.15, hl,
+      // front-outer (high)
+      s*(hw+rampW), fy+0.15+rampH, -hl,
+      // front-inner (high)
+      s*(hw-0.3), fy+0.15+rampH, -hl,
+    ]);
+    const rampGeo = new THREE.BufferGeometry();
+    rampGeo.setAttribute('position', new THREE.BufferAttribute(rampVerts, 3));
+    rampGeo.setIndex([0,1,2, 0,2,3]);
+    const rampMesh = new THREE.Mesh(rampGeo, new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:0.2}));
+    p.add(rampMesh);
+
+    // Grid lines along the ramp (longitudinal - showing the upward slope)
+    for(let f=0; f<=1; f+=0.25){
+      const x = s*(hw + 0.1 + rampW*f);
+      const pts = [
+        new THREE.Vector3(x, fy+0.15, hl),
+        new THREE.Vector3(x, fy+0.15+rampH, -hl)
+      ];
+      p.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gLine(0.2)));
+    }
+    // Cross lines on ramp
+    for(let g=-hl; g<=hl; g+=3){
+      const frac = 1 - (g+hl)/tunnelLen; // 0 at back, 1 at front
+      const y = fy+0.15 + rampH*frac;
+      const pts = [
+        new THREE.Vector3(s*(hw-0.3), y, g),
+        new THREE.Vector3(s*(hw+rampW), y, g)
+      ];
+      p.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gLine(0.15)));
+    }
+
+    // Outer wall at top of ramp
+    const wallPts = [
+      new THREE.Vector3(s*(hw+rampW), fy+0.15, hl),
+      new THREE.Vector3(s*(hw+rampW), fy+0.15+rampH, -hl)
+    ];
+    p.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(wallPts), gLine(0.5)));
+  }
+
+  // Red arch at the exit end - positioned below ramp peak so you can go over
+  const archW = CFG.tw + rampW*2;
+  const archH = 3.0; // lower than rampH so the ramp clears it
+  const archTop = makeRedBlock(archW, 0.5, 1.0);
+  archTop.position.set(0, fy+0.15+archH, -hl+0.5);
+  p.add(archTop);
+  activeObs.push({mesh:archTop, parent:p, hw:archW/2, hh:0.25+CFG.ballR*0.3, hd:0.5+CFG.ballR*0.3, moving:false});
+
+  // Speed boost pad on floor
+  const pad = new THREE.Mesh(
+    new THREE.PlaneGeometry(CFG.tw*0.5, tunnelLen*0.6),
+    new THREE.MeshBasicMaterial({color:G, transparent:true, opacity:0.15})
+  );
+  pad.rotation.x = -Math.PI/2;
+  pad.position.y = fy + 0.02;
+  p.add(pad);
+
+  // End ramp (the one at the very end you'd normally go over)
+  const endRamp = new THREE.Mesh(
+    new THREE.BoxGeometry(CFG.tw*0.85, 0.2, 3),
+    new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:0.3})
+  );
+  endRamp.position.set(0, fy+0.6, -hl+1.5);
+  endRamp.rotation.x = 0.25;
+  p.add(endRamp);
+
+  p.userData.isSpeedtunnel = true;
+  p.userData.rampW = rampW;
+  p.userData.rampH = rampH;
+  p.userData.tunnelHL = hl;
+  return len;
+}
+
+// =========== LEVEL GENERATION ===========
+const earlyTypes = ['rng','slant','straight'];
+const middleTypes = ['treblock','tunnel','snake'];
+const lateTypes = ['hor','vert'];
+
+function pickObstacle(types, thinAllowed){
+  let pool = [...types];
+  // Thin obstacles (straights, snakes) stop after 50 points
+  if(!thinAllowed){
+    pool = pool.filter(t => t !== 'straight' && t !== 'snake');
+  }
+  if(pool.length === 0) pool = [...types].filter(t => t !== 'straight' && t !== 'snake');
+  if(pool.length === 0) pool = [...types]; // fallback
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+function generateObstacle(type){
+  switch(type){
+    case 'rng': return genRNGBlock(genZ);
+    case 'slant': return genSlant(genZ);
+    case 'straight': return genStraight(genZ);
+    case 'treblock': return genTreblocks(genZ);
+    case 'tunnel': return genTunnel(genZ);
+    case 'snake': return genSnake(genZ);
+    case 'hor': return genHors(genZ);
+    case 'vert': return genVerts(genZ);
+    default: return genRNGBlock(genZ);
+  }
+}
+
+// Gap sizes - keep platforms close, spacing comes from longer platforms
+const SEAM_GAP = 0.4;    // between same-type obstacles in a set (nearly seamless)
+const SET_GAP = 1.5;     // between different obstacle type sets
+const TUNNEL_GAP = 2.5;  // before/after speedtunnel
+
+function genSet(type, count){
+  // Thin obstacles (straight, snake) are always solo
+  const isSolo = (type === 'straight' || type === 'snake');
+  const n = isSolo ? 1 : count;
+  for(let i=0; i<n; i++){
+    const used = generateObstacle(type);
+    genZ -= used;
+    if(i < n-1) genZ -= SEAM_GAP; // tiny gap between same-type
+  }
+}
+
+function generateSection(){
+  sectionNum++;
+  const thinAllowed = score < 50;
+
+  if(sectionNum === 1){
+    // 1 early obstacle
+    const type = pickObstacle(earlyTypes, thinAllowed);
+    genSet(type, 1);
+  } else if(sectionNum === 2){
+    // 2 early + 2 middle
+    const eType = pickObstacle(earlyTypes, thinAllowed);
+    genSet(eType, 2);
+    genZ -= SET_GAP;
+    const mType = pickObstacle(middleTypes, thinAllowed);
+    genSet(mType, 2);
+  } else {
+    // Section 3: sets of 3; section 4+: sets of 4
+    const setSize = sectionNum === 3 ? 3 : 4;
+    const eType = pickObstacle(earlyTypes, thinAllowed);
+    genSet(eType, setSize);
+    genZ -= SET_GAP;
+    const mType = pickObstacle(middleTypes, thinAllowed);
+    genSet(mType, setSize);
+    genZ -= SET_GAP;
+    const lType = pickObstacle(lateTypes, true);
+    genSet(lType, setSize);
+  }
+
+  // End section with speedtunnel
+  genZ -= TUNNEL_GAP;
+  const stLen = genSpeedtunnel(genZ);
+  genZ -= stLen;
+  genZ -= TUNNEL_GAP;
+}
+
+// =========== GAME LOGIC ===========
+function reset(){
+  platforms.forEach(p => scene.remove(p));
+  platforms = [];
+  activeObs = [];
+  bpx=0; bpy=0; bvx=0; bvy=0;
+  score=0; speed=CFG.baseSpd; dist=0;
+  genZ=0; sectionNum=0; shake=0; dead=false;
+
+  // Start with a flat runway seamlessly into first section
+  makePlatform(-12, 24, CFG.tw);
+  genZ = -24.3;
+
+  for(let i=0;i<3;i++) generateSection();
+
+  ball.position.set(0,0,0);
+  ball.visible = true;
+  running = true;
+  lastT = performance.now();
+  sEl.textContent = '0';
+}
+
+function die(){
+  running = false; dead = true;
+  ball.visible = false; shake = 1.5;
+  const fs = Math.floor(score);
+  fsEl.textContent = fs;
+  nbEl.style.display = 'none';
+  if(fs > hiScore){
+    hiScore = fs;
+    try{localStorage.setItem('incline_hi',''+hiScore)}catch(e){}
+    nbEl.style.display = 'block';
+    hiEl.textContent = 'BEST: '+hiScore;
+  }
+  setTimeout(()=>{ osEl.classList.remove('hide'); osEl.classList.add('show'); }, 600);
+}
+
+function isOnPlatform(){
+  const bx = ball.position.x, bz = ball.position.z;
+  for(const p of platforms){
+    const d = p.userData;
+    const pz = p.position.z;
+    const px = p.position.x || 0;
+    if(bz > pz - d.length/2 && bz < pz + d.length/2){
+      if(d.isSnake){
+        // Snake: check against curved path center at ball's Z
+        const frac = 1 - (bz - (pz - d.length/2)) / d.length; // 0 at entrance, 1 at exit
+        const pathX = Math.sin(frac * Math.PI * 2.5) * d.snakeAmplitude;
+        if(Math.abs(bx - pathX) < d.snakeHW + 0.2){
+          return d;
+        }
+      } else if(Math.abs(bx - px) < d.width/2 + 0.1){
+        return d;
+      }
+    }
+  }
+  return null;
+}
+
+function checkCol(){
+  const bx=ball.position.x, by=ball.position.y, bz=ball.position.z;
+  if(by < -12) return true; // fell into void
+
+  for(const o of activeObs){
+    const wp = new THREE.Vector3();
+    o.mesh.getWorldPosition(wp);
+    if(Math.abs(bx-wp.x)<o.hw && Math.abs(by-wp.y)<o.hh && Math.abs(bz-wp.z)<o.hd) return true;
+  }
+  return false;
+}
+
+// =========== MOVING OBSTACLES ===========
+function updateMovingObs(now){
+  for(const o of activeObs){
+    if(!o.moving) continue;
+    const elapsed = now - o.born - o.delay;
+    if(elapsed < 0) continue; // hasn't started yet
+
+    if(o.type === 'hor'){
+      // Ping-pong side to side
+      const range = o.maxX - o.minX;
+      const cycle = range / o.spd * 2; // full cycle time
+      const t = (elapsed % cycle) / cycle;
+      const x = t < 0.5 ? o.minX + (t*2)*range : o.maxX - ((t-0.5)*2)*range;
+      o.mesh.position.x = x;
+    }
+    else if(o.type === 'vert'){
+      // Up-down cycle: 2s up, 2s down
+      const t = (elapsed % o.period) / o.period;
+      const y = t < 0.5
+        ? o.baseY + (t*2) * o.amplitude
+        : o.baseY + (1 - (t-0.5)*2) * o.amplitude;
+      o.mesh.position.y = y;
+    }
+  }
+}
+
+// =========== MAIN LOOP ===========
+function loop(ts){
+  requestAnimationFrame(loop);
+  const dt = Math.min((ts - lastT)/1000, 0.05);
+  lastT = ts;
+  const now = ts/1000;
+
+  if(running){
+    // Steer
+    const dir = (keys.r?1:0) - (keys.l?1:0);
+    bvx += dir * CFG.steer * dt;
+    bvx *= CFG.damp;
+    bpx += bvx * dt;
+
+    // Speed
+    speed = Math.min(CFG.maxSpd, speed + CFG.spdUp * dt);
+    dist += speed * dt;
+
+    // Apply speed boost in speedtunnels + ramp riding
+    for(const p of platforms){
+      if(p.userData.isSpeedtunnel){
+        const pz = p.position.z;
+        const bz = -dist;
+        const hl = p.userData.tunnelHL || 10;
+        if(bz > pz - hl && bz < pz + hl){
+          speed = Math.min(CFG.maxSpd, speed + 2 * dt);
+          // Side ramp riding - ramp slopes up in the forward direction
+          const hw = CFG.tw/2;
+          const rampW = p.userData.rampW || 1.6;
+          const rampH = p.userData.rampH || 3.5;
+          const abx = Math.abs(bpx);
+          if(abx > hw - 0.5 && abx < hw + rampW + 0.5){
+            // How far forward through the tunnel (0=entrance, 1=exit)
+            const zFrac = 1 - (bz - (pz - hl)) / (hl * 2);
+            const rampY = zFrac * rampH;
+            if(bpy <= rampY + 0.2){
+              bpy = rampY;
+              bvy = Math.max(bvy, 0);
+            }
+          }
+        }
+      }
+    }
+
+    // Gravity
+    const onPlat = isOnPlatform();
+    bvy -= CFG.gravity * dt;
+    bpy += bvy * dt;
+
+    if(onPlat){
+      let groundY = 0;
+      // On slants, ground height varies with x position
+      if(onPlat.slantDir && onPlat.tiltHeight){
+        const hw = onPlat.width/2;
+        const frac = (bpx + hw) / onPlat.width; // 0=left, 1=right
+        // dir>0: right side high. dir<0: left side high.
+        if(onPlat.slantDir > 0) groundY = onPlat.tiltHeight * frac;
+        else groundY = onPlat.tiltHeight * (1 - frac);
+      }
+      if(bpy <= groundY){
+        bvy = 0; bpy = groundY;
+        // Slant push - strong force toward the LOW side
+        if(onPlat.slantDir){
+          bvx -= onPlat.slantDir * 38 * dt;
+          // Reduce damping on slants so the push accumulates
+          bvx *= 1.02;
+        }
+      }
+    }
+
+    // Edge death - if on platform, check width (skip for speedtunnel ramps)
+    if(onPlat && bpy <= 0.1 && !onPlat.isSpeedtunnel){
+      const px = platforms.find(p=>{
+        const d=p.userData, pz=p.position.z;
+        return -dist > pz-d.length/2 && -dist < pz+d.length/2;
+      });
+      if(px && Math.abs(bpx - (px.position.x||0)) > px.userData.width/2 + 0.15){
+        // Fell off edge
+        bvy = -2; // start falling
+      }
+    }
+
+    ball.position.set(bpx, bpy, -dist);
+    ball.rotation.x -= speed * dt / CFG.ballR;
+    ball.rotation.z -= bvx * dt * 0.3;
+
+    score = dist * 0.5;
+    sEl.textContent = Math.floor(score);
+    secEl.textContent = 'SECTION ' + sectionNum;
+
+    // Update moving obstacles
+    updateMovingObs(now);
+
+    // Generate more if needed
+    while(genZ > -dist - 250){
+      generateSection();
+    }
+
+    // Cleanup far behind platforms
+    for(let i=platforms.length-1;i>=0;i--){
+      const p = platforms[i];
+      if(ball.position.z - p.position.z < -p.userData.length){
+        activeObs = activeObs.filter(o => o.parent !== p);
+        scene.remove(p);
+        platforms.splice(i,1);
+      }
+    }
+
+    // Recycle buildings
+    for(const b of bgBuilds){
+      if(ball.position.z - b.position.z < -30) b.position.z -= 30*18;
+    }
+
+    if(checkCol()) die();
+  }
+
+  if(shake>0) shake *= 0.9;
+
+  // Camera
+  const tgt = new THREE.Vector3(bpx*0.3, bpy+3.8, ball.position.z+7);
+  cam.position.lerp(tgt, running ? 0.08 : 0.03);
+  if(shake>0.01){
+    cam.position.x += (Math.random()-0.5)*shake;
+    cam.position.y += (Math.random()-0.5)*shake*0.5;
+  }
+  cam.lookAt(bpx*0.5, bpy-1.5, ball.position.z-14);
+  ren.render(scene, cam);
+}
+
+// =========== INPUT ===========
+document.addEventListener('keydown', e=>{
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'||e.key==='ArrowUp'||e.key==='ArrowDown') e.preventDefault();
+  if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') keys.l=true;
+  if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') keys.r=true;
+});
+document.addEventListener('keyup', e=>{
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'||e.key==='ArrowUp'||e.key==='ArrowDown') e.preventDefault();
+  if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') keys.l=false;
+  if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') keys.r=false;
+});
+document.addEventListener('touchstart', e=>{
+  if(e.touches[0].clientX < innerWidth/2) keys.l=true; else keys.r=true;
+},{passive:true});
+document.addEventListener('touchend', ()=>{keys.l=false;keys.r=false},{passive:true});
+
+document.getElementById('play-btn').addEventListener('click',()=>{
+  ssEl.classList.add('hidden');
+  reset();
+  requestAnimationFrame(loop);
+});
+document.getElementById('re-btn').addEventListener('click',()=>{
+  osEl.classList.remove('show');
+  osEl.classList.add('hide');
+  reset();
+});
+
+window.addEventListener('resize',()=>{
+  if(!cam||!ren) return;
+  cam.aspect=innerWidth/innerHeight;
+  cam.updateProjectionMatrix();
+  ren.setSize(innerWidth,innerHeight);
+});
+
+// Init & idle
+init();
+cam.position.set(0,4,8);
+cam.lookAt(0,0,-10);
+// Make a short runway for the title screen
+makePlatform(-20, 40, CFG.tw);
+ball.position.set(0,0,0);
+
+(function idle(){
+  if(!running&&!dead){
+    cam.position.x=Math.sin(performance.now()*0.0003)*1.5;
+    cam.position.y=4+Math.sin(performance.now()*0.0005)*0.3;
+    cam.lookAt(0,-1,-14);
+    ren.render(scene,cam);
+    requestAnimationFrame(idle);
+  }
+})();
+
+})();
+</script>
+</body>
+</html>
