@@ -70,32 +70,48 @@
 </div>
 <div class="screen hide" id="mp-screen">
   <h1 style="font-size:36px;margin-bottom:8px">INCLINE</h1>
-  <div id="mp-view-host" style="display:none;text-align:center">
-    <div class="mode-label">YOUR ROOM CODE</div>
-    <div id="room-code">????</div>
-    <div id="mp-status">WAITING FOR PLAYERS...</div>
-    <div id="player-list"></div>
-    <button class="btn" id="mp-start-btn" disabled style="opacity:0.4">START GAME</button>
+  <!-- Name entry -->
+  <div id="mp-name-view" style="text-align:center">
+    <div class="mode-label">YOUR NAME</div>
+    <input id="name-input" maxlength="10" placeholder="NAME" autocomplete="off" spellcheck="false" style="font-family:'Press Start 2P',monospace;font-size:20px;letter-spacing:4px;background:transparent;border:none;border-bottom:2px solid #0f0;color:#0f0;text-align:center;width:200px;outline:none;text-transform:uppercase">
     <br>
-    <button class="btn btn-small" id="mp-back-host" style="margin-top:12px;font-size:9px;border-color:rgba(0,255,0,0.3);color:rgba(0,255,0,0.3)">BACK</button>
-  </div>
-  <div id="mp-view-join" style="display:none;text-align:center">
-    <div class="mode-label">ENTER ROOM CODE</div>
-    <input id="room-input" maxlength="4" placeholder="XXXX" autocomplete="off" spellcheck="false">
-    <div id="mp-status-join"></div>
-    <div id="player-list-join"></div>
-    <button class="btn" id="mp-join-btn" style="margin-top:16px">JOIN</button>
-    <br>
-    <button class="btn btn-small" id="mp-back-join" style="margin-top:12px;font-size:9px;border-color:rgba(0,255,0,0.3);color:rgba(0,255,0,0.3)">BACK</button>
-  </div>
-  <div id="mp-view-choice" style="text-align:center">
-    <div class="mode-label">ONLINE MULTIPLAYER</div>
-    <div class="btn-row" style="margin-top:16px">
-      <button class="btn" id="mp-host-btn">HOST</button>
-      <button class="btn" id="mp-join-btn2">JOIN</button>
+    <div class="btn-row" style="margin-top:20px">
+      <button class="btn" id="mp-to-host">HOST</button>
+      <button class="btn" id="mp-to-join">JOIN</button>
     </div>
-    <button class="btn btn-small" id="mp-back-choice" style="margin-top:20px;font-size:9px;border-color:rgba(0,255,0,0.3);color:rgba(0,255,0,0.3)">BACK</button>
+    <button class="btn btn-small" id="mp-back-name" style="margin-top:16px;border-color:rgba(0,255,0,0.3);color:rgba(0,255,0,0.3)">BACK</button>
   </div>
+  <!-- Host lobby -->
+  <div id="mp-host-view" style="display:none;text-align:center">
+    <div class="mode-label">ROOM CODE</div>
+    <div id="room-code" style="font-size:48px;letter-spacing:10px;color:#0f0;text-shadow:0 0 20px rgba(0,255,0,0.5);margin:12px 0;font-family:'Press Start 2P',monospace">????</div>
+    <div class="mode-label">GAME MODE</div>
+    <div class="btn-row" style="margin-bottom:12px">
+      <button class="btn btn-small mp-mode-btn active" data-mode="linked" style="border-color:#4488ff;color:#4488ff">LINKED</button>
+      <button class="btn btn-small mp-mode-btn" data-mode="last" style="border-color:rgba(0,255,0,0.3);color:rgba(0,255,0,0.3)">LAST STAND</button>
+    </div>
+    <div id="mp-status" style="font-size:9px;color:rgba(0,255,0,0.5);letter-spacing:2px;margin:8px 0;min-height:16px">WAITING FOR PLAYERS...</div>
+    <div id="player-list" style="font-size:9px;margin:8px 0 16px;min-height:40px"></div>
+    <button class="btn" id="mp-start-btn" disabled style="opacity:0.4">START ROUND</button>
+    <br><button class="btn btn-small" id="mp-back-host" style="margin-top:12px;border-color:rgba(0,255,0,0.3);color:rgba(0,255,0,0.3)">BACK</button>
+  </div>
+  <!-- Join lobby -->
+  <div id="mp-join-view" style="display:none;text-align:center">
+    <div class="mode-label">ENTER ROOM CODE</div>
+    <input id="room-input" maxlength="4" placeholder="XXXX" autocomplete="off" spellcheck="false" style="font-family:'Press Start 2P',monospace;font-size:28px;letter-spacing:8px;background:transparent;border:none;border-bottom:2px solid #0f0;color:#0f0;text-align:center;width:180px;outline:none;text-transform:uppercase">
+    <div id="mp-status-join" style="font-size:9px;color:rgba(0,255,0,0.5);letter-spacing:2px;margin:12px 0;min-height:16px"></div>
+    <div id="player-list-join" style="font-size:9px;margin:8px 0 16px;min-height:40px"></div>
+    <button class="btn" id="mp-join-btn">JOIN</button>
+    <br><button class="btn btn-small" id="mp-back-join" style="margin-top:12px;border-color:rgba(0,255,0,0.3);color:rgba(0,255,0,0.3)">BACK</button>
+  </div>
+</div>
+<!-- Round results overlay -->
+<div class="screen hide" id="round-screen" style="background:rgba(0,0,0,0.9)">
+  <h2 id="round-title" style="color:#0f0;font-size:24px;margin-bottom:16px">ROUND OVER</h2>
+  <div id="round-results" style="font-size:11px;letter-spacing:2px;margin-bottom:20px"></div>
+  <div id="round-tally" style="font-size:9px;color:rgba(0,255,0,0.4);letter-spacing:2px;margin-bottom:24px"></div>
+  <button class="btn" id="next-round-btn" style="display:none">NEXT ROUND</button>
+  <div id="round-wait" style="font-size:9px;color:rgba(0,255,0,0.3);letter-spacing:2px;display:none">WAITING FOR HOST...</div>
 </div>
 <div class="screen hide" id="os">
   <h2>GAME OVER</h2>
@@ -134,7 +150,7 @@ const CFG = {
   baseSpd: 22,
   maxSpd: 60,
   spdUp: 0.5,
-  steer: 130,
+  steer: 156,
   damp: 0.84,
   platLen: 14,
   platGap: 5,
@@ -148,7 +164,8 @@ function makeBallState(){ return {vx:0, vy:0, px:0, py:0, alive:true, mesh:null}
 let b1 = makeBallState(); // A/D controls (yellow in dual, green in solo)
 let b2 = makeBallState(); // Arrow controls (blue)
 
-let score=0, hiScore=0, speed=0, dist=0;
+let score=0, speed=0, dist=0;
+let hiScores={solo:0,dual_last:0,dual_linked:0};
 let running=false, dead=false;
 let keys={l1:false,r1:false,l2:false,r2:false}; // 1=A/D, 2=arrows
 let lastT=0, shake=0;
@@ -167,8 +184,19 @@ const bsEl=document.getElementById('ball-status');
 const b1sEl=document.getElementById('b1-status');
 const b2sEl=document.getElementById('b2-status');
 
-try{hiScore=parseInt(localStorage.getItem('incline_hi')||'0')}catch(e){}
-if(hiScore>0) hiEl.textContent='BEST: '+hiScore;
+try{
+  hiScores.solo=parseInt(localStorage.getItem('incline_hi_solo')||'0');
+  hiScores.dual_last=parseInt(localStorage.getItem('incline_hi_dual_last')||'0');
+  hiScores.dual_linked=parseInt(localStorage.getItem('incline_hi_dual_linked')||'0');
+}catch(e){}
+function updateHiDisplay(){
+  const parts=[];
+  if(hiScores.solo>0) parts.push('SOLO: '+hiScores.solo);
+  if(hiScores.dual_last>0) parts.push('LAST STAND: '+hiScores.dual_last);
+  if(hiScores.dual_linked>0) parts.push('LINKED: '+hiScores.dual_linked);
+  hiEl.textContent=parts.join('  ');
+}
+updateHiDisplay();
 
 // =========== MATERIALS ===========
 const gWire = (op=0.12) => new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:op});
@@ -802,7 +830,7 @@ function killBall(b, statusEl){
   b.mesh.visible = false;
   if(statusEl) statusEl.className = 'dead';
   shake = 1.0;
-  if(gameMode === 'online'){ mpSendDie(); gameOver(); return; }
+  if(gameMode === 'online'){ mpSendDie(); return; } // keep running to watch others
   if(gameMode === 'dual_linked') gameOver();
   else if(gameMode === 'dual_last'){ if(!b1.alive && !b2.alive) gameOver(); }
   else gameOver();
@@ -810,14 +838,16 @@ function killBall(b, statusEl){
 
 function gameOver(){
   running = false; dead = true;
+  if(gameMode === 'online') return; // online uses round results screen
   const fs = Math.floor(score);
   fsEl.textContent = fs;
   nbEl.style.display = 'none';
-  if(fs > hiScore){
-    hiScore = fs;
-    try{localStorage.setItem('incline_hi',''+hiScore)}catch(e){}
+  const modeKey = gameMode === 'solo' ? 'solo' : gameMode === 'dual_last' ? 'dual_last' : 'dual_linked';
+  if(fs > (hiScores[modeKey]||0)){
+    hiScores[modeKey] = fs;
+    try{localStorage.setItem('incline_hi_'+modeKey,''+fs)}catch(e){}
     nbEl.style.display = 'block';
-    hiEl.textContent = 'BEST: '+hiScore;
+    updateHiDisplay();
   }
   setTimeout(()=>{ osEl.classList.remove('hide'); osEl.classList.add('show'); }, 600);
 }
@@ -943,6 +973,7 @@ function loop(ts){
   const now = ts/1000;
 
   if(running){
+    syncKeys();
     speed = Math.min(CFG.maxSpd, speed + CFG.spdUp * dt);
     dist += speed * dt;
 
@@ -1023,11 +1054,20 @@ function loop(ts){
 
   if(shake>0) shake *= 0.9;
 
-  // Camera follows alive ball(s)
-  let cx=0, cy=0;
-  if(gameMode==='solo'||!b2.alive){ cx=b1.mesh.position.x*0.35; cy=b1.mesh.position.y+3.8; }
-  else if(!b1.alive){ cx=b2.mesh.position.x*0.35; cy=b2.mesh.position.y+3.8; }
-  else { cx=(b1.mesh.position.x+b2.mesh.position.x)*0.5*0.35; cy=Math.max(b1.mesh.position.y,b2.mesh.position.y)+3.8; }
+  // Don't fight with idle camera on menu screens
+  if(!running && !dead){ ren.render(scene,cam); return; }
+
+  // Camera always primarily follows b1
+  let cx = b1.mesh.position.x * 0.35;
+  let cy = b1.mesh.position.y + 3.8;
+  // In dual mode, widen view slightly to keep b2 visible
+  if((gameMode==='dual_last'||gameMode==='dual_linked') && b2.alive){
+    cx = (b1.mesh.position.x * 0.7 + b2.mesh.position.x * 0.3) * 0.35;
+    cy = Math.max(b1.mesh.position.y, b2.mesh.position.y) + 3.8;
+  } else if((gameMode==='dual_last'||gameMode==='dual_linked') && !b1.alive && b2.alive){
+    cx = b2.mesh.position.x * 0.35;
+    cy = b2.mesh.position.y + 3.8;
+  }
 
   const tgt = new THREE.Vector3(cx, cy, -dist+7);
   cam.position.lerp(tgt, running ? 0.08 : 0.03);
@@ -1037,29 +1077,49 @@ function loop(ts){
 }
 
 // =========== INPUT ===========
+let keysAD={l:false,r:false}, keysArrow={l:false,r:false};
+function syncKeys(){
+  if(gameMode==='solo'||gameMode==='online'){
+    keys.l1=keysAD.l||keysArrow.l; keys.r1=keysAD.r||keysArrow.r;
+  } else {
+    // Dual mode: A/D=ball1, Arrows=ball2
+    // BUT if one ball is dead, both key sets go to the surviving ball
+    if(!b2.alive){
+      keys.l1=keysAD.l||keysArrow.l; keys.r1=keysAD.r||keysArrow.r;
+    } else if(!b1.alive){
+      keys.l2=keysAD.l||keysArrow.l; keys.r2=keysAD.r||keysArrow.r;
+    } else {
+      keys.l1=keysAD.l; keys.r1=keysAD.r;
+      keys.l2=keysArrow.l; keys.r2=keysArrow.r;
+    }
+  }
+}
 document.addEventListener('keydown', e=>{
   if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) e.preventDefault();
-  if(e.key==='a'||e.key==='A') keys.l1=true;
-  if(e.key==='d'||e.key==='D') keys.r1=true;
-  if(e.key==='ArrowLeft'){ if(gameMode==='solo') keys.l1=true; else keys.l2=true; }
-  if(e.key==='ArrowRight'){ if(gameMode==='solo') keys.r1=true; else keys.r2=true; }
+  if(e.key==='a'||e.key==='A') keysAD.l=true;
+  if(e.key==='d'||e.key==='D') keysAD.r=true;
+  if(e.key==='ArrowLeft') keysArrow.l=true;
+  if(e.key==='ArrowRight') keysArrow.r=true;
+  syncKeys();
 });
 document.addEventListener('keyup', e=>{
-  if(e.key==='a'||e.key==='A') keys.l1=false;
-  if(e.key==='d'||e.key==='D') keys.r1=false;
-  if(e.key==='ArrowLeft'){ keys.l1=false; keys.l2=false; }
-  if(e.key==='ArrowRight'){ keys.r1=false; keys.r2=false; }
+  if(e.key==='a'||e.key==='A') keysAD.l=false;
+  if(e.key==='d'||e.key==='D') keysAD.r=false;
+  if(e.key==='ArrowLeft') keysArrow.l=false;
+  if(e.key==='ArrowRight') keysArrow.r=false;
+  syncKeys();
 });
 document.addEventListener('touchstart', e=>{
   if(e.touches[0].clientX < innerWidth/2) keys.l1=true; else keys.r1=true;
 },{passive:true});
 document.addEventListener('touchend', ()=>{keys.l1=false;keys.r1=false;keys.l2=false;keys.r2=false;},{passive:true});
 
+let loopRunning = false;
 function startGame(mode){
   gameMode = mode;
   ssEl.classList.add('hidden');
   reset();
-  requestAnimationFrame(loop);
+  if(!loopRunning){ loopRunning=true; requestAnimationFrame(loop); }
 }
 document.getElementById('play-solo').addEventListener('click',()=>startGame('solo'));
 document.getElementById('play-last').addEventListener('click',()=>startGame('dual_last'));
@@ -1083,201 +1143,288 @@ document.getElementById('menu-btn').addEventListener('click',()=>{
   })();
 });
 
+
 // =========== MULTIPLAYER ===========
 const ABLY_KEY = 'HmF23g.2ief3w:6QAYCui0eFUYLjGVENZ_nfbjIey-V1alMIdBZ8e0lv4';
-let ablyClient = null, ablyChannel = null;
-let mpMode = false;
-let myPlayerId = null;
-let myPlayerIndex = 0;
-let roomPlayers = {}; // id -> {index, name, alive}
-let ghostBalls = {};  // id -> THREE.Mesh
-let isHost = false;
-let mpRoomCode = '';
-let posTimer = 0;
+let ablyClient=null, ablyChannel=null;
+let mpMode=false, isHost=false, mpRoomCode='';
+let myPlayerId=null, myName='', myPlayerIndex=0;
+let roomPlayers={}; // id -> {index, name, alive, wins}
+let ghostBalls={};  // id -> THREE.Mesh
+let posTimer=0, roundNum=0;
+let mpGameType='linked'; // 'linked' or 'last'
+let deathOrder=[];
 
-const mpScreen = document.getElementById('mp-screen');
-const mpViewChoice = document.getElementById('mp-view-choice');
-const mpViewHost = document.getElementById('mp-view-host');
-const mpViewJoin = document.getElementById('mp-view-join');
-const roomCodeEl = document.getElementById('room-code');
-const mpStatusEl = document.getElementById('mp-status');
-const mpStatusJoinEl = document.getElementById('mp-status-join');
-const playerListEl = document.getElementById('player-list');
-const playerListJoinEl = document.getElementById('player-list-join');
-const mpStartBtn = document.getElementById('mp-start-btn');
-const roomInput = document.getElementById('room-input');
+const mpScreen=document.getElementById('mp-screen');
+const mpNameView=document.getElementById('mp-name-view');
+const mpHostView=document.getElementById('mp-host-view');
+const mpJoinView=document.getElementById('mp-join-view');
+const roomCodeEl=document.getElementById('room-code');
+const mpStatusEl=document.getElementById('mp-status');
+const mpStatusJoinEl=document.getElementById('mp-status-join');
+const playerListEl=document.getElementById('player-list');
+const playerListJoinEl=document.getElementById('player-list-join');
+const mpStartBtn=document.getElementById('mp-start-btn');
+const roomInput=document.getElementById('room-input');
+const nameInput=document.getElementById('name-input');
+const roundScreen=document.getElementById('round-screen');
+const roundTitle=document.getElementById('round-title');
+const roundResults=document.getElementById('round-results');
+const roundTally=document.getElementById('round-tally');
+const nextRoundBtn=document.getElementById('next-round-btn');
+const roundWait=document.getElementById('round-wait');
 
 function genRoomCode(){
   return Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random()*23)]).join('');
 }
 
 function makeGhostBall(color){
-  const m = makeBallMesh(color);
-  m.children[0].material.opacity = 0.12;
+  const m=makeBallMesh(color);
+  m.traverse(c=>{if(c.material){c.material.opacity*=0.5;c.material.transparent=true;}});
   scene.add(m);
   return m;
 }
 
-function updatePlayerListUI(el, players){
-  el.innerHTML = Object.values(players).map(p =>
-    `<div style="color:#${PLAYER_COLORS[p.index].toString(16).padStart(6,'0')}">${p.alive?'●':'○'} PLAYER ${p.index+1}${p.isMe?' (YOU)':''}</div>`
-  ).join('');
+function updateListUI(el, players){
+  el.innerHTML=Object.values(players).sort((a,b)=>a.index-b.index).map(p=>{
+    const col='#'+PLAYER_COLORS[p.index%6].toString(16).padStart(6,'0');
+    const tag=p.id===myPlayerId?' (YOU)':'';
+    const wins=p.wins?` [${p.wins}W]`:'';
+    return `<div style="color:${col};margin:3px 0">${p.alive!==false?'●':'○'} ${p.name||'???'}${tag}${wins}</div>`;
+  }).join('');
 }
 
 async function connectAbly(){
   if(ablyClient) return;
-  ablyClient = new Ably.Realtime({key: ABLY_KEY, clientId: 'p_'+Math.random().toString(36).slice(2,9)});
-  myPlayerId = ablyClient.auth.clientId;
-  await new Promise(r => ablyClient.connection.once('connected', r));
+  ablyClient=new Ably.Realtime({key:ABLY_KEY,clientId:'p_'+Math.random().toString(36).slice(2,9)});
+  myPlayerId=ablyClient.auth.clientId;
+  await new Promise(r=>ablyClient.connection.once('connected',r));
 }
 
+// ---- HOST ----
 async function hostRoom(){
-  mpViewChoice.style.display='none';
-  mpViewHost.style.display='block';
+  myName=nameInput.value.trim().toUpperCase()||'HOST';
+  mpNameView.style.display='none';
+  mpHostView.style.display='block';
   await connectAbly();
-  isHost = true;
-  mpRoomCode = genRoomCode();
-  roomCodeEl.textContent = mpRoomCode;
-  myPlayerIndex = 0;
-  roomPlayers[myPlayerId] = {index:0, alive:true, isMe:true};
-  updatePlayerListUI(playerListEl, roomPlayers);
+  isHost=true;
+  mpRoomCode=genRoomCode();
+  roomCodeEl.textContent=mpRoomCode;
+  myPlayerIndex=0;
+  roomPlayers={};
+  roomPlayers[myPlayerId]={id:myPlayerId,index:0,name:myName,alive:true,wins:0};
+  updateListUI(playerListEl,roomPlayers);
 
-  ablyChannel = ablyClient.channels.get('incline-'+mpRoomCode);
-  ablyChannel.subscribe(msg => handleMpMsg(msg));
+  ablyChannel=ablyClient.channels.get('incline-'+mpRoomCode);
+  ablyChannel.subscribe(msg=>handleMsg(msg));
 
-  ablyChannel.presence.enter({index:0});
-  ablyChannel.presence.subscribe('enter', m => {
-    const idx = Object.keys(roomPlayers).length;
-    if(idx < 6 && !roomPlayers[m.clientId]){
-      roomPlayers[m.clientId] = {index:idx, alive:true, isMe:false};
-      updatePlayerListUI(playerListEl, roomPlayers);
-      mpStatusEl.textContent = `${Object.keys(roomPlayers).length} PLAYERS CONNECTED`;
-      mpStartBtn.disabled = false;
-      mpStartBtn.style.opacity = '1';
-      // Tell new player their index and current roster
-      ablyChannel.publish('roster', {players: roomPlayers, forId: m.clientId});
-    }
+  // When someone requests to join
+  ablyChannel.subscribe('join_req',msg=>{
+    if(!isHost) return;
+    const d=msg.data;
+    if(roomPlayers[d.id]||Object.keys(roomPlayers).length>=6) return;
+    const idx=Object.keys(roomPlayers).length;
+    roomPlayers[d.id]={id:d.id,index:idx,name:d.name,alive:true,wins:0};
+    updateListUI(playerListEl,roomPlayers);
+    mpStatusEl.textContent=Object.keys(roomPlayers).length+' PLAYERS';
+    mpStartBtn.disabled=false; mpStartBtn.style.opacity='1';
+    // Send full roster to everyone
+    ablyChannel.publish('roster',{players:roomPlayers});
   });
-  ablyChannel.presence.subscribe('leave', m => {
-    delete roomPlayers[m.clientId];
-    updatePlayerListUI(playerListEl, roomPlayers);
+
+  ablyChannel.subscribe('leave',msg=>{
+    delete roomPlayers[msg.data.id];
+    delete ghostBalls[msg.data.id];
+    updateListUI(playerListEl,roomPlayers);
   });
 }
 
+// ---- JOIN ----
 async function joinRoom(code){
+  myName=nameInput.value.trim().toUpperCase()||'PLAYER';
+  mpNameView.style.display='none';
+  mpJoinView.style.display='block';
   await connectAbly();
-  isHost = false;
-  mpRoomCode = code;
-  ablyChannel = ablyClient.channels.get('incline-'+code);
-  ablyChannel.subscribe(msg => handleMpMsg(msg));
-  ablyChannel.presence.enter({});
-  mpStatusJoinEl.textContent = 'CONNECTING...';
+  isHost=false;
+  mpRoomCode=code.toUpperCase();
+  ablyChannel=ablyClient.channels.get('incline-'+mpRoomCode);
+  ablyChannel.subscribe(msg=>handleMsg(msg));
+  // Send join request
+  ablyChannel.publish('join_req',{id:myPlayerId,name:myName});
+  mpStatusJoinEl.textContent='JOINING...';
 }
 
-function handleMpMsg(msg){
-  const d = msg.data;
-  if(msg.name === 'roster' && (d.forId === myPlayerId || !d.forId)){
-    // Assign index
-    if(d.players[myPlayerId]){
-      myPlayerIndex = d.players[myPlayerId].index;
-    }
-    roomPlayers = d.players;
-    roomPlayers[myPlayerId] = roomPlayers[myPlayerId] || {index: myPlayerIndex, alive:true};
-    roomPlayers[myPlayerId].isMe = true;
-    updatePlayerListUI(playerListJoinEl, roomPlayers);
-    mpStatusJoinEl.textContent = `${Object.keys(roomPlayers).length} PLAYERS IN ROOM`;
+// ---- MESSAGE HANDLER ----
+function handleMsg(msg){
+  const d=msg.data;
+
+  if(msg.name==='roster'){
+    // Update our local roster
+    Object.entries(d.players).forEach(([id,p])=>{
+      if(!roomPlayers[id]) roomPlayers[id]={...p};
+      else Object.assign(roomPlayers[id],p);
+      roomPlayers[id].id=id;
+    });
+    if(roomPlayers[myPlayerId]) myPlayerIndex=roomPlayers[myPlayerId].index;
+    updateListUI(playerListEl,roomPlayers);
+    updateListUI(playerListJoinEl,roomPlayers);
+    mpStatusJoinEl.textContent=Object.keys(roomPlayers).length+' PLAYERS IN ROOM';
   }
-  if(msg.name === 'start'){
-    const seed = d.seed;
-    setSeed(seed);
-    mpViewHost.style.display='none';
-    mpViewJoin.style.display='none';
-    mpScreen.classList.add('hide');
-    mpMode = true;
-    gameMode = 'online';
-    // Build ghost balls for all other players
-    Object.entries(roomPlayers).forEach(([id, p]) => {
-      if(id !== myPlayerId){
-        ghostBalls[id] = makeGhostBall(PLAYER_COLORS[p.index]);
+
+  if(msg.name==='start'){
+    roundNum=d.round||1;
+    mpGameType=d.mode||'linked';
+    setSeed(d.seed);
+    deathOrder=[];
+    // Mark all alive
+    Object.values(roomPlayers).forEach(p=>p.alive=true);
+    // Build ghost balls
+    Object.entries(roomPlayers).forEach(([id,p])=>{
+      if(id!==myPlayerId){
+        if(ghostBalls[id]) scene.remove(ghostBalls[id]);
+        ghostBalls[id]=makeGhostBall(PLAYER_COLORS[p.index%6]);
       }
     });
+    // Hide screens, start game
+    mpHostView.style.display='none';
+    mpJoinView.style.display='none';
+    mpScreen.classList.add('hide');mpScreen.classList.remove('show');
+    roundScreen.classList.add('hide');roundScreen.classList.remove('show');
+    mpMode=true; gameMode='online';
     reset();
   }
-  if(msg.name === 'pos' && msg.clientId !== myPlayerId && ghostBalls[msg.clientId]){
-    const gb = ghostBalls[msg.clientId];
-    gb.position.set(d.x, d.y, d.z);
-    gb.visible = d.alive;
+
+  if(msg.name==='pos'&&msg.clientId!==myPlayerId){
+    const gb=ghostBalls[msg.clientId];
+    if(gb){gb.position.set(d.x,d.y,d.z);gb.visible=d.alive!==false;}
   }
-  if(msg.name === 'gameover' && msg.clientId !== myPlayerId){
-    if(roomPlayers[msg.clientId]) roomPlayers[msg.clientId].alive = false;
-    if(ghostBalls[msg.clientId]) ghostBalls[msg.clientId].visible = false;
+
+  if(msg.name==='died'&&msg.clientId!==myPlayerId){
+    if(roomPlayers[msg.clientId]){
+      roomPlayers[msg.clientId].alive=false;
+      deathOrder.push(msg.clientId);
+    }
+    if(ghostBalls[msg.clientId]) ghostBalls[msg.clientId].visible=false;
+    checkRoundEnd();
+  }
+
+  if(msg.name==='round_result'){
+    showRoundResults(d);
   }
 }
 
 function mpSendPos(){
-  if(!ablyChannel || !mpMode || !b1.alive) return;
-  ablyChannel.publish('pos', {x:b1.px, y:b1.py, z:-dist, alive:true});
+  if(!ablyChannel||!mpMode) return;
+  ablyChannel.publish('pos',{x:b1.px,y:b1.py,z:-dist,alive:b1.alive});
 }
 
 function mpSendDie(){
-  if(!ablyChannel || !mpMode) return;
-  ablyChannel.publish('gameover', {});
+  if(!ablyChannel||!mpMode) return;
+  ablyChannel.publish('died',{});
+  deathOrder.push(myPlayerId);
+  if(roomPlayers[myPlayerId]) roomPlayers[myPlayerId].alive=false;
+  checkRoundEnd();
 }
+
+function checkRoundEnd(){
+  const alive=Object.entries(roomPlayers).filter(([id,p])=>p.alive);
+  if(alive.length<=1){
+    // Round over
+    if(alive.length===1){
+      const winnerId=alive[0][0];
+      roomPlayers[winnerId].wins=(roomPlayers[winnerId].wins||0)+1;
+    }
+    if(isHost){
+      // Host broadcasts round results
+      const results=Object.entries(roomPlayers).map(([id,p])=>({
+        id,name:p.name,wins:p.wins||0,
+        survived:p.alive,
+      }));
+      setTimeout(()=>ablyChannel.publish('round_result',{results,round:roundNum}),500);
+    }
+  }
+}
+
+function showRoundResults(d){
+  running=false; dead=true;
+  // Update wins from results
+  d.results.forEach(r=>{if(roomPlayers[r.id]) roomPlayers[r.id].wins=r.wins;});
+  const winner=d.results.find(r=>r.survived);
+  roundTitle.textContent=winner?winner.name+' WINS!':'DRAW!';
+  roundTitle.style.color=winner?'#'+PLAYER_COLORS[(roomPlayers[winner.id]||{index:0}).index%6].toString(16).padStart(6,'0'):'#0f0';
+  roundResults.innerHTML='<div style="margin-bottom:12px">ROUND '+d.round+'</div>'+
+    d.results.sort((a,b)=>b.wins-a.wins).map(r=>{
+      const col='#'+PLAYER_COLORS[(roomPlayers[r.id]||{index:0}).index%6].toString(16).padStart(6,'0');
+      return `<div style="color:${col};margin:4px 0">${r.name}: ${r.wins} WIN${r.wins!==1?'S':''}</div>`;
+    }).join('');
+  roundTally.textContent='';
+  nextRoundBtn.style.display=isHost?'inline-block':'none';
+  roundWait.style.display=isHost?'none':'block';
+  roundScreen.classList.remove('hide');roundScreen.classList.add('show');
+}
+
+nextRoundBtn.addEventListener('click',()=>{
+  roundNum++;
+  const seed=Math.floor(Math.random()*2147483647);
+  ablyChannel.publish('start',{seed,round:roundNum,mode:mpGameType});
+});
 
 function cleanupMp(){
-  mpMode = false;
-  Object.values(ghostBalls).forEach(g => scene.remove(g));
-  ghostBalls = {};
-  roomPlayers = {};
-  if(ablyChannel){ ablyChannel.presence.leave(); ablyChannel.unsubscribe(); ablyChannel=null; }
-  ablyClient = null;
-  isHost = false;
+  mpMode=false;
+  Object.values(ghostBalls).forEach(g=>scene.remove(g));
+  ghostBalls={}; roomPlayers={}; deathOrder=[];
+  if(ablyChannel){try{ablyChannel.publish('leave',{id:myPlayerId});}catch(e){} ablyChannel.unsubscribe();ablyChannel=null;}
+  if(ablyClient){try{ablyClient.close();}catch(e){}} ablyClient=null;
+  isHost=false; roundNum=0;
 }
 
-// MP UI handlers
+function showMpScreen(){
+  mpScreen.classList.remove('hide');mpScreen.classList.add('show');
+  mpNameView.style.display='block';mpHostView.style.display='none';mpJoinView.style.display='none';
+}
+
+// ---- MP MODE SELECT BUTTONS ----
+document.querySelectorAll('.mp-mode-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.mp-mode-btn').forEach(b=>{b.style.borderColor='rgba(0,255,0,0.3)';b.style.color='rgba(0,255,0,0.3)';});
+    btn.style.borderColor='#4488ff';btn.style.color='#4488ff';
+    mpGameType=btn.dataset.mode;
+  });
+});
+
+// ---- MP UI HANDLERS ----
 document.getElementById('play-online').addEventListener('click',()=>{
   ssEl.classList.add('hidden');
-  mpScreen.classList.remove('hide'); mpScreen.classList.add('show');
-  mpViewChoice.style.display='block'; mpViewHost.style.display='none'; mpViewJoin.style.display='none';
+  showMpScreen();
 });
-document.getElementById('mp-host-btn').addEventListener('click', hostRoom);
-document.getElementById('mp-join-btn2').addEventListener('click',()=>{
-  mpViewChoice.style.display='none'; mpViewJoin.style.display='block';
+document.getElementById('mp-to-host').addEventListener('click',hostRoom);
+document.getElementById('mp-to-join').addEventListener('click',()=>{
+  myName=nameInput.value.trim().toUpperCase()||'PLAYER';
+  mpNameView.style.display='none';mpJoinView.style.display='block';
   roomInput.focus();
 });
 document.getElementById('mp-join-btn').addEventListener('click',()=>{
-  const code = roomInput.value.toUpperCase().trim();
-  if(code.length===4) joinRoom(code);
+  const c=roomInput.value.toUpperCase().trim();
+  if(c.length===4) joinRoom(c);
 });
-roomInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ const c=roomInput.value.toUpperCase().trim(); if(c.length===4) joinRoom(c); }});
+roomInput.addEventListener('keydown',e=>{if(e.key==='Enter'){const c=roomInput.value.toUpperCase().trim();if(c.length===4)joinRoom(c);}});
 
 mpStartBtn.addEventListener('click',()=>{
   if(!isHost) return;
-  const seed = Math.floor(Math.random()*2147483647);
-  setSeed(seed);
-  ablyChannel.publish('start', {seed});
-  // Also trigger start locally
-  Object.entries(roomPlayers).forEach(([id,p])=>{
-    if(id!==myPlayerId) ghostBalls[id] = makeGhostBall(PLAYER_COLORS[p.index]);
-  });
-  mpViewHost.style.display='none';
-  mpScreen.classList.add('hide');
-  mpMode=true; gameMode='online';
-  reset();
+  roundNum=1;
+  const seed=Math.floor(Math.random()*2147483647);
+  ablyChannel.publish('start',{seed,round:1,mode:mpGameType});
 });
 
-const backToMenu = () => {
-  mpScreen.classList.remove('show'); mpScreen.classList.add('hide');
-  mpViewChoice.style.display='block'; mpViewHost.style.display='none'; mpViewJoin.style.display='none';
+const goBackToMenu=()=>{
+  mpScreen.classList.remove('show');mpScreen.classList.add('hide');
+  roundScreen.classList.remove('show');roundScreen.classList.add('hide');
   ssEl.classList.remove('hidden');
   cleanupMp();
 };
-document.getElementById('mp-back-host').addEventListener('click', backToMenu);
-document.getElementById('mp-back-join').addEventListener('click', backToMenu);
-document.getElementById('mp-back-choice').addEventListener('click', ()=>{
-  mpScreen.classList.remove('show'); mpScreen.classList.add('hide');
-  ssEl.classList.remove('hidden');
-});
+document.getElementById('mp-back-name').addEventListener('click',goBackToMenu);
+document.getElementById('mp-back-host').addEventListener('click',goBackToMenu);
+document.getElementById('mp-back-join').addEventListener('click',goBackToMenu);
 
 window.addEventListener('resize',()=>{
   if(!cam||!ren) return;
