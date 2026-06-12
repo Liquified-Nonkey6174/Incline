@@ -50,6 +50,10 @@
 <div id="ui">
   <div id="score-val">0</div>
   <div id="section-label"></div>
+  <div id="jump-display" style="position:absolute;top:20px;right:20px;font-size:9px;color:rgba(0,255,0,0.5);letter-spacing:2px;text-align:right">
+    <div id="jump-count" style="font-size:18px;color:#0f0;font-family:'Press Start 2P',monospace">1</div>
+    <div>JUMPS</div>
+  </div>
   <div id="ball-status">
     <div id="b1-status" class="alive">● A/D</div>
     <div id="b2-status" class="alive" style="margin-top:4px">● ←→</div>
@@ -66,7 +70,7 @@
   <div class="mode-label">ONLINE</div>
   <button class="btn" style="border-color:#4488ff;color:#4488ff" id="play-online">MULTIPLAYER</button>
   <div id="hi"></div>
-  <div id="hint">LAST STAND: SURVIVE UNTIL BOTH DIE &nbsp; LINKED: ONE DIES = BOTH DIE</div>
+  <div id="hint">STEER: A/D OR ←→ &nbsp; JUMP: SPACE/W/↑ &nbsp; +1 JUMP EVERY 200 PTS</div>
 </div>
 <div class="screen hide" id="mp-screen">
   <h1 style="font-size:36px;margin-bottom:8px">INCLINE</h1>
@@ -85,11 +89,6 @@
   <div id="mp-host-view" style="display:none;text-align:center">
     <div class="mode-label">ROOM CODE</div>
     <div id="room-code" style="font-size:48px;letter-spacing:10px;color:#0f0;text-shadow:0 0 20px rgba(0,255,0,0.5);margin:12px 0;font-family:'Press Start 2P',monospace">????</div>
-    <div class="mode-label">GAME MODE</div>
-    <div class="btn-row" style="margin-bottom:12px">
-      <button class="btn btn-small mp-mode-btn active" data-mode="linked" style="border-color:#4488ff;color:#4488ff">LINKED</button>
-      <button class="btn btn-small mp-mode-btn" data-mode="last" style="border-color:rgba(0,255,0,0.3);color:rgba(0,255,0,0.3)">LAST STAND</button>
-    </div>
     <div id="mp-status" style="font-size:9px;color:rgba(0,255,0,0.5);letter-spacing:2px;margin:8px 0;min-height:16px">WAITING FOR PLAYERS...</div>
     <div id="player-list" style="font-size:9px;margin:8px 0 16px;min-height:40px"></div>
     <button class="btn" id="mp-start-btn" disabled style="opacity:0.4">START ROUND</button>
@@ -148,7 +147,7 @@ const CFG = {
   ballR: 0.5,
   gravity: 28,
   baseSpd: 22,
-  maxSpd: 60,
+  maxSpd: 999,
   spdUp: 0.5,
   steer: 156,
   damp: 0.84,
@@ -169,6 +168,11 @@ let hiScores={solo:0,dual_last:0,dual_linked:0};
 let running=false, dead=false;
 let keys={l1:false,r1:false,l2:false,r2:false}; // 1=A/D, 2=arrows
 let lastT=0, shake=0;
+let loopRunning=false;
+let jumpsRemaining=1, lastJumpMilestone=0;
+const JUMP_HEIGHT = 2.4; // 2x red block height (~1.2)
+const JUMP_VEL = Math.sqrt(2 * 28 * JUMP_HEIGHT); // v = sqrt(2*g*h)
+const jumpCountEl=document.getElementById('jump-count');
 let platforms=[], activeObs=[], bgBuilds=[];
 let genZ=0;
 let sectionNum=0;
@@ -708,15 +712,8 @@ const earlyTypes = ['rng','slant','straight'];
 const middleTypes = ['treblock','tunnel','snake'];
 const lateTypes = ['hor','vert'];
 
-function pickObstacle(types, thinAllowed){
-  let pool = [...types];
-  // Thin obstacles (straights, snakes) stop after 50 points
-  if(!thinAllowed){
-    pool = pool.filter(t => t !== 'straight' && t !== 'snake');
-  }
-  if(pool.length === 0) pool = [...types].filter(t => t !== 'straight' && t !== 'snake');
-  if(pool.length === 0) pool = [...types]; // fallback
-  return pool[rngInt(pool.length)];
+function pickObstacle(types){
+  return types[rngInt(types.length)];
 }
 
 function generateObstacle(type){
@@ -751,29 +748,29 @@ function genSet(type, count){
 
 function generateSection(){
   sectionNum++;
-  const thinAllowed = score < 50;
+  
 
   if(sectionNum === 1){
     // 1 early obstacle
-    const type = pickObstacle(earlyTypes, thinAllowed);
+    const type = pickObstacle(earlyTypes);
     genSet(type, 1);
   } else if(sectionNum === 2){
     // 2 early + 2 middle
-    const eType = pickObstacle(earlyTypes, thinAllowed);
+    const eType = pickObstacle(earlyTypes);
     genSet(eType, 2);
     genZ -= SET_GAP;
-    const mType = pickObstacle(middleTypes, thinAllowed);
+    const mType = pickObstacle(middleTypes);
     genSet(mType, 2);
   } else {
     // Section 3: sets of 3; section 4+: sets of 4
     const setSize = sectionNum === 3 ? 3 : 4;
-    const eType = pickObstacle(earlyTypes, thinAllowed);
+    const eType = pickObstacle(earlyTypes);
     genSet(eType, setSize);
     genZ -= SET_GAP;
-    const mType = pickObstacle(middleTypes, thinAllowed);
+    const mType = pickObstacle(middleTypes);
     genSet(mType, setSize);
     genZ -= SET_GAP;
-    const lType = pickObstacle(lateTypes, true);
+    const lType = pickObstacle(lateTypes);
     genSet(lType, setSize);
   }
 
@@ -813,6 +810,8 @@ function reset(){
 
   score=0; speed=CFG.baseSpd; dist=0;
   genZ=0; sectionNum=0; shake=0; dead=false;
+  jumpsRemaining=1; lastJumpMilestone=0;
+  jumpCountEl.textContent='1';
 
   makePlatform(-10, 30, CFG.tw);
   genZ = -25.3;
@@ -823,6 +822,7 @@ function reset(){
   running = true;
   lastT = performance.now();
   sEl.textContent = '0';
+  if(!loopRunning){ loopRunning=true; requestAnimationFrame(loop); }
 }
 
 function killBall(b, statusEl){
@@ -962,6 +962,17 @@ function updateBall(b, kl, kr, dt){
   b.mesh.position.set(b.px, b.py, -dist);
   b.mesh.rotation.x -= speed * dt / CFG.ballR;
   b.mesh.rotation.z -= b.vx * dt * 0.3;
+
+  // JUMP - can jump anytime (ground or air) if jumps available
+  if(jumpQueue > 0 && jumpsRemaining > 0 && b === b1){
+    b.vy = JUMP_VEL;
+    jumpsRemaining--;
+    jumpQueue--;
+    jumpCountEl.textContent = jumpsRemaining;
+    b.mesh.position.y = b.py;
+  }
+  if(b === b1) jumpQueue = 0; // clear any excess queued jumps
+
   return checkColAt(b.px, b.py, -dist);
 }
 
@@ -974,14 +985,14 @@ function loop(ts){
 
   if(running){
     syncKeys();
-    speed = Math.min(CFG.maxSpd, speed + CFG.spdUp * dt);
+    speed += (CFG.spdUp + speed * 0.003) * dt;
     dist += speed * dt;
 
     // Speedtunnel global boost
     for(const p of platforms){
       if(p.userData.isSpeedtunnel){
         const pz = p.position.z, bz = -dist, hl = p.userData.tunnelHL || 10;
-        if(bz > pz - hl && bz < pz + hl) speed = Math.min(CFG.maxSpd, speed + 2 * dt);
+        if(bz > pz - hl && bz < pz + hl) speed += 4 * dt;
       }
     }
 
@@ -1026,6 +1037,14 @@ function loop(ts){
     score = dist * 0.5;
     sEl.textContent = Math.floor(score);
     secEl.textContent = 'SECTION ' + sectionNum;
+
+    // Award a jump every 200 points
+    const milestone = Math.floor(score / 200);
+    if(milestone > lastJumpMilestone){
+      jumpsRemaining += (milestone - lastJumpMilestone);
+      lastJumpMilestone = milestone;
+      jumpCountEl.textContent = jumpsRemaining;
+    }
     updateMovingObs(now);
     while(genZ > -dist - 250) generateSection();
 
@@ -1078,6 +1097,7 @@ function loop(ts){
 
 // =========== INPUT ===========
 let keysAD={l:false,r:false}, keysArrow={l:false,r:false};
+let jumpQueue=0; // number of jump presses queued
 function syncKeys(){
   if(gameMode==='solo'||gameMode==='online'){
     keys.l1=keysAD.l||keysArrow.l; keys.r1=keysAD.r||keysArrow.r;
@@ -1095,11 +1115,14 @@ function syncKeys(){
   }
 }
 document.addEventListener('keydown', e=>{
-  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) e.preventDefault();
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault();
   if(e.key==='a'||e.key==='A') keysAD.l=true;
   if(e.key==='d'||e.key==='D') keysAD.r=true;
   if(e.key==='ArrowLeft') keysArrow.l=true;
   if(e.key==='ArrowRight') keysArrow.r=true;
+  if(e.key===' '||e.key==='w'||e.key==='W'||e.key==='ArrowUp'){
+    jumpQueue++;
+  }
   syncKeys();
 });
 document.addEventListener('keyup', e=>{
@@ -1114,7 +1137,6 @@ document.addEventListener('touchstart', e=>{
 },{passive:true});
 document.addEventListener('touchend', ()=>{keys.l1=false;keys.r1=false;keys.l2=false;keys.r2=false;},{passive:true});
 
-let loopRunning = false;
 function startGame(mode){
   gameMode = mode;
   ssEl.classList.add('hidden');
@@ -1149,10 +1171,9 @@ const ABLY_KEY = 'HmF23g.2ief3w:6QAYCui0eFUYLjGVENZ_nfbjIey-V1alMIdBZ8e0lv4';
 let ablyClient=null, ablyChannel=null;
 let mpMode=false, isHost=false, mpRoomCode='';
 let myPlayerId=null, myName='', myPlayerIndex=0;
-let roomPlayers={}; // id -> {index, name, alive, wins}
-let ghostBalls={};  // id -> THREE.Mesh
+let roomPlayers={};
+let ghostBalls={};
 let posTimer=0, roundNum=0;
-let mpGameType='linked'; // 'linked' or 'last'
 let deathOrder=[];
 
 const mpScreen=document.getElementById('mp-screen');
@@ -1180,25 +1201,51 @@ function genRoomCode(){
 
 function makeGhostBall(color){
   const m=makeBallMesh(color);
-  m.traverse(c=>{if(c.material){c.material.opacity*=0.5;c.material.transparent=true;}});
+  m.traverse(c=>{if(c.material){c.material.opacity=Math.min(c.material.opacity,0.3);c.material.transparent=true;}});
   scene.add(m);
   return m;
 }
 
-function updateListUI(el, players){
-  el.innerHTML=Object.values(players).sort((a,b)=>a.index-b.index).map(p=>{
+function updateListUI(el){
+  el.innerHTML=Object.values(roomPlayers).sort((a,b)=>a.index-b.index).map(p=>{
     const col='#'+PLAYER_COLORS[p.index%6].toString(16).padStart(6,'0');
     const tag=p.id===myPlayerId?' (YOU)':'';
-    const wins=p.wins?` [${p.wins}W]`:'';
-    return `<div style="color:${col};margin:3px 0">${p.alive!==false?'●':'○'} ${p.name||'???'}${tag}${wins}</div>`;
+    const wins=p.wins?' ['+p.wins+'W]':'';
+    return '<div style="color:'+col+';margin:3px 0">'+(p.alive!==false?'●':'○')+' '+p.name+tag+wins+'</div>';
   }).join('');
 }
 
 async function connectAbly(){
   if(ablyClient) return;
-  ablyClient=new Ably.Realtime({key:ABLY_KEY,clientId:'p_'+Math.random().toString(36).slice(2,9)});
+  ablyClient=new Ably.Realtime({key:ABLY_KEY,clientId:'p_'+Math.random().toString(36).slice(2,9),echoMessages:true});
   myPlayerId=ablyClient.auth.clientId;
   await new Promise(r=>ablyClient.connection.once('connected',r));
+}
+
+function startMpGame(seed,round){
+  setSeed(seed);
+  roundNum=round;
+  deathOrder=[];
+  Object.values(roomPlayers).forEach(p=>{p.alive=true;});
+
+  // Build ghost balls for other players
+  Object.keys(ghostBalls).forEach(id=>{scene.remove(ghostBalls[id]);});
+  ghostBalls={};
+  Object.entries(roomPlayers).forEach(([id,p])=>{
+    if(id!==myPlayerId) ghostBalls[id]=makeGhostBall(PLAYER_COLORS[p.index%6]);
+  });
+
+  // Hide all screens
+  mpHostView.style.display='none';
+  mpJoinView.style.display='none';
+  mpNameView.style.display='none';
+  mpScreen.classList.add('hide');mpScreen.classList.remove('show');
+  roundScreen.classList.add('hide');roundScreen.classList.remove('show');
+
+  mpMode=true;
+  gameMode='online';
+  reset();
+  if(!loopRunning){loopRunning=true;requestAnimationFrame(loop);}
 }
 
 // ---- HOST ----
@@ -1213,43 +1260,25 @@ async function hostRoom(){
   myPlayerIndex=0;
   roomPlayers={};
   roomPlayers[myPlayerId]={id:myPlayerId,index:0,name:myName,alive:true,wins:0};
-  updateListUI(playerListEl,roomPlayers);
+  updateListUI(playerListEl);
 
   ablyChannel=ablyClient.channels.get('incline-'+mpRoomCode);
-  ablyChannel.subscribe(msg=>handleMsg(msg));
-
-  // When someone requests to join
-  ablyChannel.subscribe('join_req',msg=>{
-    if(!isHost) return;
-    const d=msg.data;
-    if(roomPlayers[d.id]||Object.keys(roomPlayers).length>=6) return;
-    const idx=Object.keys(roomPlayers).length;
-    roomPlayers[d.id]={id:d.id,index:idx,name:d.name,alive:true,wins:0};
-    updateListUI(playerListEl,roomPlayers);
-    mpStatusEl.textContent=Object.keys(roomPlayers).length+' PLAYERS';
-    mpStartBtn.disabled=false; mpStartBtn.style.opacity='1';
-    // Send full roster to everyone
-    ablyChannel.publish('roster',{players:roomPlayers});
-  });
-
-  ablyChannel.subscribe('leave',msg=>{
-    delete roomPlayers[msg.data.id];
-    delete ghostBalls[msg.data.id];
-    updateListUI(playerListEl,roomPlayers);
-  });
+  ablyChannel.subscribe(handleMsg);
 }
 
 // ---- JOIN ----
 async function joinRoom(code){
   myName=nameInput.value.trim().toUpperCase()||'PLAYER';
-  mpNameView.style.display='none';
-  mpJoinView.style.display='block';
   await connectAbly();
   isHost=false;
   mpRoomCode=code.toUpperCase();
+  mpNameView.style.display='none';
+  mpJoinView.style.display='block';
+
   ablyChannel=ablyClient.channels.get('incline-'+mpRoomCode);
-  ablyChannel.subscribe(msg=>handleMsg(msg));
-  // Send join request
+  ablyChannel.subscribe(handleMsg);
+
+  // Request to join
   ablyChannel.publish('join_req',{id:myPlayerId,name:myName});
   mpStatusJoinEl.textContent='JOINING...';
 }
@@ -1257,59 +1286,56 @@ async function joinRoom(code){
 // ---- MESSAGE HANDLER ----
 function handleMsg(msg){
   const d=msg.data;
+  const senderId=msg.clientId||d.id;
+
+  if(msg.name==='join_req' && isHost && senderId!==myPlayerId){
+    if(roomPlayers[d.id]||Object.keys(roomPlayers).length>=6) return;
+    const idx=Object.keys(roomPlayers).length;
+    roomPlayers[d.id]={id:d.id,index:idx,name:d.name,alive:true,wins:0};
+    updateListUI(playerListEl);
+    mpStatusEl.textContent=Object.keys(roomPlayers).length+' PLAYERS';
+    mpStartBtn.disabled=false;mpStartBtn.style.opacity='1';
+    ablyChannel.publish('roster',{players:roomPlayers});
+  }
 
   if(msg.name==='roster'){
-    // Update our local roster
     Object.entries(d.players).forEach(([id,p])=>{
-      if(!roomPlayers[id]) roomPlayers[id]={...p};
-      else Object.assign(roomPlayers[id],p);
-      roomPlayers[id].id=id;
+      roomPlayers[id]={...p,id:id};
     });
     if(roomPlayers[myPlayerId]) myPlayerIndex=roomPlayers[myPlayerId].index;
-    updateListUI(playerListEl,roomPlayers);
-    updateListUI(playerListJoinEl,roomPlayers);
+    updateListUI(playerListEl);
+    updateListUI(playerListJoinEl);
     mpStatusJoinEl.textContent=Object.keys(roomPlayers).length+' PLAYERS IN ROOM';
+    mpStatusEl.textContent=Object.keys(roomPlayers).length+' PLAYERS';
   }
 
-  if(msg.name==='start'){
-    roundNum=d.round||1;
-    mpGameType=d.mode||'linked';
-    setSeed(d.seed);
-    deathOrder=[];
-    // Mark all alive
-    Object.values(roomPlayers).forEach(p=>p.alive=true);
-    // Build ghost balls
-    Object.entries(roomPlayers).forEach(([id,p])=>{
-      if(id!==myPlayerId){
-        if(ghostBalls[id]) scene.remove(ghostBalls[id]);
-        ghostBalls[id]=makeGhostBall(PLAYER_COLORS[p.index%6]);
-      }
-    });
-    // Hide screens, start game
-    mpHostView.style.display='none';
-    mpJoinView.style.display='none';
-    mpScreen.classList.add('hide');mpScreen.classList.remove('show');
-    roundScreen.classList.add('hide');roundScreen.classList.remove('show');
-    mpMode=true; gameMode='online';
-    reset();
+  if(msg.name==='start_game'){
+    startMpGame(d.seed, d.round);
   }
 
-  if(msg.name==='pos'&&msg.clientId!==myPlayerId){
-    const gb=ghostBalls[msg.clientId];
-    if(gb){gb.position.set(d.x,d.y,d.z);gb.visible=d.alive!==false;}
+  if(msg.name==='pos' && senderId!==myPlayerId && ghostBalls[senderId]){
+    ghostBalls[senderId].position.set(d.x,d.y,d.z);
+    ghostBalls[senderId].visible=d.alive!==false;
   }
 
-  if(msg.name==='died'&&msg.clientId!==myPlayerId){
-    if(roomPlayers[msg.clientId]){
-      roomPlayers[msg.clientId].alive=false;
-      deathOrder.push(msg.clientId);
+  if(msg.name==='died' && senderId!==myPlayerId){
+    if(roomPlayers[senderId]){
+      roomPlayers[senderId].alive=false;
+      deathOrder.push(senderId);
     }
-    if(ghostBalls[msg.clientId]) ghostBalls[msg.clientId].visible=false;
+    if(ghostBalls[senderId]) ghostBalls[senderId].visible=false;
     checkRoundEnd();
   }
 
   if(msg.name==='round_result'){
     showRoundResults(d);
+  }
+
+  if(msg.name==='leave'){
+    delete roomPlayers[d.id];
+    if(ghostBalls[d.id]){scene.remove(ghostBalls[d.id]);delete ghostBalls[d.id];}
+    updateListUI(playerListEl);
+    updateListUI(playerListJoinEl);
   }
 }
 
@@ -1320,7 +1346,7 @@ function mpSendPos(){
 
 function mpSendDie(){
   if(!ablyChannel||!mpMode) return;
-  ablyChannel.publish('died',{});
+  ablyChannel.publish('died',{id:myPlayerId});
   deathOrder.push(myPlayerId);
   if(roomPlayers[myPlayerId]) roomPlayers[myPlayerId].alive=false;
   checkRoundEnd();
@@ -1328,26 +1354,17 @@ function mpSendDie(){
 
 function checkRoundEnd(){
   const alive=Object.entries(roomPlayers).filter(([id,p])=>p.alive);
-  if(alive.length<=1){
-    // Round over
-    if(alive.length===1){
-      const winnerId=alive[0][0];
-      roomPlayers[winnerId].wins=(roomPlayers[winnerId].wins||0)+1;
-    }
-    if(isHost){
-      // Host broadcasts round results
-      const results=Object.entries(roomPlayers).map(([id,p])=>({
-        id,name:p.name,wins:p.wins||0,
-        survived:p.alive,
-      }));
-      setTimeout(()=>ablyChannel.publish('round_result',{results,round:roundNum}),500);
-    }
+  if(alive.length<=1 && isHost){
+    if(alive.length===1) roomPlayers[alive[0][0]].wins=(roomPlayers[alive[0][0]].wins||0)+1;
+    const results=Object.values(roomPlayers).map(p=>({
+      id:p.id,name:p.name,wins:p.wins||0,survived:p.alive
+    }));
+    setTimeout(()=>ablyChannel.publish('round_result',{results,round:roundNum}),800);
   }
 }
 
 function showRoundResults(d){
   running=false; dead=true;
-  // Update wins from results
   d.results.forEach(r=>{if(roomPlayers[r.id]) roomPlayers[r.id].wins=r.wins;});
   const winner=d.results.find(r=>r.survived);
   roundTitle.textContent=winner?winner.name+' WINS!':'DRAW!';
@@ -1355,9 +1372,8 @@ function showRoundResults(d){
   roundResults.innerHTML='<div style="margin-bottom:12px">ROUND '+d.round+'</div>'+
     d.results.sort((a,b)=>b.wins-a.wins).map(r=>{
       const col='#'+PLAYER_COLORS[(roomPlayers[r.id]||{index:0}).index%6].toString(16).padStart(6,'0');
-      return `<div style="color:${col};margin:4px 0">${r.name}: ${r.wins} WIN${r.wins!==1?'S':''}</div>`;
+      return '<div style="color:'+col+';margin:4px 0">'+r.name+': '+r.wins+' WIN'+(r.wins!==1?'S':'')+'</div>';
     }).join('');
-  roundTally.textContent='';
   nextRoundBtn.style.display=isHost?'inline-block':'none';
   roundWait.style.display=isHost?'none':'block';
   roundScreen.classList.remove('hide');roundScreen.classList.add('show');
@@ -1366,36 +1382,23 @@ function showRoundResults(d){
 nextRoundBtn.addEventListener('click',()=>{
   roundNum++;
   const seed=Math.floor(Math.random()*2147483647);
-  ablyChannel.publish('start',{seed,round:roundNum,mode:mpGameType});
+  ablyChannel.publish('start_game',{seed:seed,round:roundNum});
 });
 
 function cleanupMp(){
   mpMode=false;
   Object.values(ghostBalls).forEach(g=>scene.remove(g));
-  ghostBalls={}; roomPlayers={}; deathOrder=[];
-  if(ablyChannel){try{ablyChannel.publish('leave',{id:myPlayerId});}catch(e){} ablyChannel.unsubscribe();ablyChannel=null;}
+  ghostBalls={};roomPlayers={};deathOrder=[];
+  if(ablyChannel){try{ablyChannel.publish('leave',{id:myPlayerId});}catch(e){} try{ablyChannel.unsubscribe();}catch(e){} ablyChannel=null;}
   if(ablyClient){try{ablyClient.close();}catch(e){}} ablyClient=null;
-  isHost=false; roundNum=0;
+  isHost=false;roundNum=0;
 }
-
-function showMpScreen(){
-  mpScreen.classList.remove('hide');mpScreen.classList.add('show');
-  mpNameView.style.display='block';mpHostView.style.display='none';mpJoinView.style.display='none';
-}
-
-// ---- MP MODE SELECT BUTTONS ----
-document.querySelectorAll('.mp-mode-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.mp-mode-btn').forEach(b=>{b.style.borderColor='rgba(0,255,0,0.3)';b.style.color='rgba(0,255,0,0.3)';});
-    btn.style.borderColor='#4488ff';btn.style.color='#4488ff';
-    mpGameType=btn.dataset.mode;
-  });
-});
 
 // ---- MP UI HANDLERS ----
 document.getElementById('play-online').addEventListener('click',()=>{
   ssEl.classList.add('hidden');
-  showMpScreen();
+  mpScreen.classList.remove('hide');mpScreen.classList.add('show');
+  mpNameView.style.display='block';mpHostView.style.display='none';mpJoinView.style.display='none';
 });
 document.getElementById('mp-to-host').addEventListener('click',hostRoom);
 document.getElementById('mp-to-join').addEventListener('click',()=>{
@@ -1413,7 +1416,8 @@ mpStartBtn.addEventListener('click',()=>{
   if(!isHost) return;
   roundNum=1;
   const seed=Math.floor(Math.random()*2147483647);
-  ablyChannel.publish('start',{seed,round:1,mode:mpGameType});
+  // Publish to everyone including self (echoMessages:true)
+  ablyChannel.publish('start_game',{seed:seed,round:1});
 });
 
 const goBackToMenu=()=>{
@@ -1425,13 +1429,6 @@ const goBackToMenu=()=>{
 document.getElementById('mp-back-name').addEventListener('click',goBackToMenu);
 document.getElementById('mp-back-host').addEventListener('click',goBackToMenu);
 document.getElementById('mp-back-join').addEventListener('click',goBackToMenu);
-
-window.addEventListener('resize',()=>{
-  if(!cam||!ren) return;
-  cam.aspect=innerWidth/innerHeight;
-  cam.updateProjectionMatrix();
-  ren.setSize(innerWidth,innerHeight);
-});
 
 // Init & idle
 init();
