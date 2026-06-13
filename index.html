@@ -69,6 +69,14 @@
   </div>
   <div class="mode-label">ONLINE</div>
   <button class="btn" style="border-color:#4488ff;color:#4488ff" id="play-online">MULTIPLAYER</button>
+  <div class="mode-label" style="margin-top:20px">CHARACTER</div>
+  <div class="btn-row" id="char-row">
+    <button class="btn btn-small char-btn active" data-shape="ball" style="border-color:#0f0;color:#0f0;padding:8px 14px">BALL</button>
+    <button class="btn btn-small char-btn" data-shape="cube" style="padding:8px 14px">CUBE</button>
+    <button class="btn btn-small char-btn" data-shape="pyramid" style="padding:8px 14px">PYRAMID</button>
+    <button class="btn btn-small char-btn" data-shape="cylinder" style="padding:8px 14px">CYLINDER</button>
+    <button class="btn btn-small char-btn" data-shape="stickman" style="padding:8px 14px">STICKMAN</button>
+  </div>
   <div id="hi"></div>
   <div id="hint">STEER: A/D OR ←→ &nbsp; JUMP: SPACE/W/↑ &nbsp; +1 JUMP EVERY 200 PTS</div>
 </div>
@@ -169,10 +177,48 @@ let running=false, dead=false;
 let keys={l1:false,r1:false,l2:false,r2:false}; // 1=A/D, 2=arrows
 let lastT=0, shake=0;
 let loopRunning=false;
+let selectedShape='ball';
+
+// Character selection
+document.querySelectorAll('.char-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.char-btn').forEach(b=>{b.style.borderColor='rgba(0,255,0,0.3)';b.style.color='rgba(0,255,0,0.3)';});
+    btn.style.borderColor='#0f0';btn.style.color='#0f0';
+    selectedShape=btn.dataset.shape;
+    // Update preview ball on title screen
+    if(b1.mesh){scene.remove(b1.mesh);}
+    b1.mesh=makeBallMesh(G, selectedShape);
+    b1.mesh.userData.isBall=true;
+    b1.mesh.position.set(0,0,0);
+    scene.add(b1.mesh);
+  });
+});
 let jumpsRemaining=1, lastJumpMilestone=0;
 const JUMP_HEIGHT = 2.4; // 2x red block height (~1.2)
 const JUMP_VEL = Math.sqrt(2 * 28 * JUMP_HEIGHT); // v = sqrt(2*g*h)
 const jumpCountEl=document.getElementById('jump-count');
+const JUMP_COLORS = [
+  0xffffff, // 0: white
+  0xffdd00, // 1: yellow
+  0xff9900, // 2: orange
+  0xff2222, // 3: red
+  0x4488ff, // 4: blue
+];
+const RAINBOW = [0xff0000,0xff8800,0xffff00,0x00ff00,0x0088ff,0x4400ff,0xaa00ff];
+function updateBallColor(bMesh, jumps){
+  let col;
+  if(jumps>=5){
+    col=RAINBOW[Math.floor(performance.now()/80)%RAINBOW.length];
+  } else {
+    col=JUMP_COLORS[jumps];
+  }
+  bMesh.traverse(c=>{
+    if(c.material){
+      c.material.color.setHex(col);
+      if(c.material.transparent) c.material.opacity=jumps>=5?0.4:0.2;
+    }
+  });
+}
 let platforms=[], activeObs=[], bgBuilds=[];
 let genZ=0;
 let sectionNum=0;
@@ -215,12 +261,81 @@ function makeRedBlock(w,h,d){
   return g;
 }
 
-function makeBallMesh(color){
-  const geo = new THREE.SphereGeometry(CFG.ballR, 12, 8);
-  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color, wireframe:true}));
-  const inner = new THREE.Mesh(new THREE.SphereGeometry(CFG.ballR*0.55,8,6),
-    new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.2}));
-  m.add(inner);
+function makeBallMesh(color, shape){
+  shape = shape || selectedShape || 'ball';
+  const R = CFG.ballR;
+  const mat = new THREE.MeshBasicMaterial({color, wireframe:true});
+  const innerMat = new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.2});
+
+  if(shape==='cube'){
+    const geo = new THREE.BoxGeometry(R*1.6, R*1.6, R*1.6, 2, 2, 2);
+    const m = new THREE.Mesh(geo, mat);
+    m.add(new THREE.Mesh(new THREE.BoxGeometry(R*1.0,R*1.0,R*1.0), innerMat));
+    m.userData.shape='cube';
+    return m;
+  }
+  if(shape==='pyramid'){
+    // Vertex pointing down - flip the cone
+    const geo = new THREE.ConeGeometry(R*1.1, R*2.0, 4, 2);
+    const m = new THREE.Mesh(geo, mat);
+    m.add(new THREE.Mesh(new THREE.ConeGeometry(R*0.6,R*1.2,4), innerMat));
+    m.rotation.x = Math.PI; // flip so vertex points down
+    m.userData.shape='pyramid';
+    m.userData.baseRotX = Math.PI;
+    return m;
+  }
+  if(shape==='cylinder'){
+    // Lay on curved side - rotate around Z by 90 degrees
+    const wrapper = new THREE.Group();
+    const geo = new THREE.CylinderGeometry(R*0.8, R*0.8, R*2.0, 8, 2);
+    const m = new THREE.Mesh(geo, mat);
+    m.add(new THREE.Mesh(new THREE.CylinderGeometry(R*0.5,R*0.5,R*1.2,8), innerMat));
+    m.rotation.z = Math.PI/2; // lay on side
+    wrapper.add(m);
+    wrapper.userData.shape='cylinder';
+    wrapper.userData.innerMesh=m;
+    return wrapper;
+  }
+  if(shape==='stickman'){
+    const group = new THREE.Group();
+    // Head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(R*0.4, 6, 4), mat.clone());
+    head.position.y = R*2.0;
+    group.add(head);
+    // Body
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(R*0.1, R*0.1, R*1.2, 4), mat.clone());
+    body.position.y = R*0.9;
+    group.add(body);
+    // Arms
+    const arms = [];
+    for(let s=-1;s<=1;s+=2){
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(R*0.08, R*0.08, R*0.9, 4), mat.clone());
+      arm.position.set(s*R*0.35, R*1.3, 0);
+      group.add(arm);
+      arms.push(arm);
+    }
+    // Legs
+    const legs = [];
+    for(let s=-1;s<=1;s+=2){
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(R*0.08, R*0.08, R*1.0, 4), mat.clone());
+      leg.position.set(s*R*0.2, -R*0.15, 0);
+      group.add(leg);
+      legs.push(leg);
+    }
+    // Inner glow
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(R*0.3, 6, 4), innerMat);
+    glow.position.y = R*1.0;
+    group.add(glow);
+    group.userData.shape='stickman';
+    group.userData.arms=arms;
+    group.userData.legs=legs;
+    return group;
+  }
+  // Default ball
+  const geo = new THREE.SphereGeometry(R, 12, 8);
+  const m = new THREE.Mesh(geo, mat);
+  m.add(new THREE.Mesh(new THREE.SphereGeometry(R*0.55,8,6), innerMat));
+  m.userData.shape='ball';
   return m;
 }
 
@@ -960,8 +1075,51 @@ function updateBall(b, kl, kr, dt){
   }
 
   b.mesh.position.set(b.px, b.py, -dist);
-  b.mesh.rotation.x -= speed * dt / CFG.ballR;
-  b.mesh.rotation.z -= b.vx * dt * 0.3;
+
+  // Shape-specific rotation/animation
+  const sh = b.mesh.userData.shape;
+  if(sh==='cube'){
+    // Stays on one face, slow helicopter spin
+    b.mesh.rotation.x = 0;
+    b.mesh.rotation.z = 0;
+    b.mesh.rotation.y += speed * dt * 0.3;
+  } else if(sh==='pyramid'){
+    // Vertex down, slow helicopter spin
+    b.mesh.rotation.x = Math.PI;
+    b.mesh.rotation.z = 0;
+    b.mesh.rotation.y += speed * dt * 0.3;
+  } else if(sh==='cylinder'){
+    // Roll forward like a wheel - rotate wrapper around X axis
+    b.mesh.rotation.x += speed * dt / CFG.ballR;
+  } else if(sh==='stickman'){
+    // Exaggerated running animation
+    const t = performance.now() * 0.004 * Math.max(1, speed * 0.06);
+    const legSwing = Math.sin(t) * 1.4;
+    const armSwing = Math.sin(t) * 1.2;
+    const bounce = Math.abs(Math.sin(t)) * 0.15;
+    const arms = b.mesh.userData.arms;
+    const legs = b.mesh.userData.legs;
+    if(legs&&legs.length===2){
+      legs[0].rotation.x = legSwing;
+      legs[1].rotation.x = -legSwing;
+    }
+    if(arms&&arms.length===2){
+      arms[0].rotation.x = -armSwing;
+      arms[1].rotation.x = armSwing;
+      // Arms swing out slightly too
+      arms[0].rotation.z = -0.3 + Math.abs(armSwing)*0.2;
+      arms[1].rotation.z = 0.3 - Math.abs(armSwing)*0.2;
+    }
+    // Slight forward lean + bounce + lean into turns
+    b.mesh.rotation.x = -0.15;
+    b.mesh.rotation.y = 0;
+    b.mesh.rotation.z = -b.vx * 0.02;
+    b.mesh.position.y += bounce;
+  } else {
+    // Default ball roll
+    b.mesh.rotation.x -= speed * dt / CFG.ballR;
+    b.mesh.rotation.z -= b.vx * dt * 0.3;
+  }
 
   // JUMP - can jump anytime (ground or air) if jumps available
   if(jumpQueue > 0 && jumpsRemaining > 0 && b === b1){
@@ -1045,6 +1203,9 @@ function loop(ts){
       lastJumpMilestone = milestone;
       jumpCountEl.textContent = jumpsRemaining;
     }
+
+    // Update ball color based on jumps
+    if(b1.alive) updateBallColor(b1.mesh, jumpsRemaining);
     updateMovingObs(now);
     while(genZ > -dist - 250) generateSection();
 
