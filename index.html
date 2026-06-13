@@ -1117,12 +1117,13 @@ function isOnPlatformAt(bx, bz){
   return null;
 }
 
-function checkColAt(bx, by, bz){
+function checkColAt(bx, by, bz, hitboxShrink){
   if(by < -12) return true;
+  const xShrink = hitboxShrink || 0;
   for(const o of activeObs){
     const wp = new THREE.Vector3();
     o.mesh.getWorldPosition(wp);
-    if(Math.abs(bx-wp.x)<o.hw && Math.abs(by-wp.y)<o.hh && Math.abs(bz-wp.z)<o.hd) return true;
+    if(Math.abs(bx-wp.x)<(o.hw - xShrink) && Math.abs(by-wp.y)<o.hh && Math.abs(bz-wp.z)<o.hd) return true;
   }
   return false;
 }
@@ -1274,7 +1275,8 @@ function updateBall(b, kl, kr, dt){
   }
   if(b === b2) jumpQueue2 = 0;
 
-  return checkColAt(b.px, b.py, -dist);
+  const shrink = (b.mesh.userData.shape==='stickman') ? CFG.ballR*0.55 : 0;
+  return checkColAt(b.px, b.py, -dist, shrink);
 }
 
 // =========== MAIN LOOP ===========
