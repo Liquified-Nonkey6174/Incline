@@ -12,26 +12,26 @@
   #ui { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 10; }
   #score-val { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 28px; color: #0f0; text-shadow: 0 0 10px rgba(0,255,0,0.7); }
   #section-label { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); font-size: 9px; color: rgba(0,255,0,0.35); letter-spacing: 2px; }
-  .screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; background: #000; pointer-events: all; }
-  .screen.hidden { opacity: 0; pointer-events: none; transition: opacity 0.4s; }
+  .screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 40px 16px 80px; overflow-y: auto; z-index: 100; background: #000; pointer-events: all; -webkit-overflow-scrolling: touch; }
+  .screen.hidden { opacity: 0; pointer-events: none; visibility: hidden; }
   .screen.hide { display: none; }
   .screen.show { display: flex; }
-  .screen h1 { font-size: 56px; color: #0f0; text-shadow: 0 0 30px rgba(0,255,0,0.5); margin-bottom: 40px; letter-spacing: 10px; }
-  .screen h2 { font-size: 32px; color: #f22; text-shadow: 0 0 20px rgba(255,34,34,0.5); margin-bottom: 28px; letter-spacing: 5px; }
-  .btn { font-family: 'Press Start 2P', monospace; font-size: 14px; padding: 12px 36px; border: 2px solid #0f0; background: transparent; color: #0f0; cursor: pointer; letter-spacing: 2px; transition: all 0.2s; pointer-events: all; margin: 6px; }
+  .screen h1 { font-size: 56px; color: #0f0; text-shadow: 0 0 30px rgba(0,255,0,0.5); margin-bottom: 40px; letter-spacing: 10px; flex-shrink: 0; }
+  .screen h2 { font-size: 32px; color: #f22; text-shadow: 0 0 20px rgba(255,34,34,0.5); margin-bottom: 28px; letter-spacing: 5px; flex-shrink: 0; }
+  .btn { font-family: 'Press Start 2P', monospace; font-size: 14px; padding: 12px 36px; border: 2px solid #0f0; background: transparent; color: #0f0; cursor: pointer; letter-spacing: 2px; transition: all 0.2s; pointer-events: all; margin: 6px; flex-shrink: 0; }
   .btn:hover { background: #0f0; color: #000; box-shadow: 0 0 20px rgba(0,255,0,0.4); }
   .btn-yellow { border-color: #ffdd00; color: #ffdd00; }
   .btn-yellow:hover { background: #ffdd00; color: #000; box-shadow: 0 0 20px rgba(255,221,0,0.4); }
-  .btn-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; justify-content: center; }
-  .mode-label { font-size: 9px; color: rgba(0,255,0,0.4); letter-spacing: 2px; margin-bottom: 12px; margin-top: 20px; }
+  .btn-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; justify-content: center; flex-shrink: 0; }
+  .mode-label { font-size: 9px; color: rgba(0,255,0,0.4); letter-spacing: 2px; margin-bottom: 12px; margin-top: 20px; flex-shrink: 0; }
   #ball-status { position: absolute; top: 20px; left: 20px; font-size: 9px; display: none; }
   #ball-status .alive { opacity: 1; }
   #ball-status .dead { opacity: 0.3; text-decoration: line-through; }
   #b1-status { color: #ffdd00; }
   #b2-status { color: #4488ff; }
   .btn:hover { background: #0f0; color: #000; box-shadow: 0 0 20px rgba(0,255,0,0.4); }
-  #hi { margin-top: 18px; font-size: 10px; color: rgba(0,255,0,0.35); }
-  #hint { position: absolute; bottom: 32px; font-size: 8px; color: rgba(0,255,0,0.2); letter-spacing: 2px; }
+  #hi { margin-top: 18px; font-size: 10px; color: rgba(0,255,0,0.35); flex-shrink: 0; }
+  #hint { margin-top: 20px; font-size: 8px; color: rgba(0,255,0,0.2); letter-spacing: 2px; flex-shrink: 0; }
   #fs { font-size: 44px; color: #0f0; text-shadow: 0 0 12px rgba(0,255,0,0.5); margin-bottom: 6px; }
   #fl { font-size: 9px; color: rgba(0,255,0,0.35); letter-spacing: 3px; margin-bottom: 36px; }
   #nb { font-size: 12px; color: #0f0; margin-bottom: 24px; display: none; animation: p 0.8s infinite; }
@@ -1354,6 +1354,7 @@ addTouchBtn('touch-up',()=>{jumpQueue++;},()=>{});
 function startGame(mode){
   gameMode = mode;
   ssEl.classList.add('hidden');
+  ssEl.style.display='none';
   reset();
   if(!loopRunning){ loopRunning=true; requestAnimationFrame(loop); }
 }
@@ -1367,7 +1368,7 @@ document.getElementById('menu-btn').addEventListener('click',()=>{
   osEl.classList.remove('show'); osEl.classList.add('hide');
   if(mpMode) cleanupMp();
   running=false; dead=false;
-  ssEl.classList.remove('hidden');
+  ssEl.style.display='flex'; ssEl.classList.remove('hidden');
   (function idle(){
     if(!running&&!dead){
       cam.position.x=Math.sin(performance.now()*0.0003)*1.5;
@@ -1453,7 +1454,7 @@ function startMpGame(seed,round){
   mpHostView.style.display='none';
   mpJoinView.style.display='none';
   mpNameView.style.display='none';
-  mpScreen.classList.add('hide');mpScreen.classList.remove('show');
+  mpScreen.classList.add('hide');mpScreen.classList.remove('show');mpScreen.style.display='none';
   roundScreen.classList.add('hide');roundScreen.classList.remove('show');
 
   mpMode=true;
@@ -1611,7 +1612,7 @@ function cleanupMp(){
 // ---- MP UI HANDLERS ----
 document.getElementById('play-online').addEventListener('click',()=>{
   ssEl.classList.add('hidden');
-  mpScreen.classList.remove('hide');mpScreen.classList.add('show');
+  mpScreen.classList.remove('hide');mpScreen.classList.add('show');mpScreen.style.display='flex';
   mpNameView.style.display='block';mpHostView.style.display='none';mpJoinView.style.display='none';
 });
 document.getElementById('mp-to-host').addEventListener('click',hostRoom);
@@ -1637,7 +1638,7 @@ mpStartBtn.addEventListener('click',()=>{
 const goBackToMenu=()=>{
   mpScreen.classList.remove('show');mpScreen.classList.add('hide');
   roundScreen.classList.remove('show');roundScreen.classList.add('hide');
-  ssEl.classList.remove('hidden');
+  ssEl.style.display='flex'; ssEl.classList.remove('hidden');
   cleanupMp();
 };
 document.getElementById('mp-back-name').addEventListener('click',goBackToMenu);
