@@ -44,6 +44,29 @@
   #player-list { font-size: 9px; margin: 8px 0 16px; min-height: 40px; }
   #player-list div { margin: 4px 0; letter-spacing: 2px; }
   .btn-small { font-size: 10px; padding: 8px 20px; }
+  #mobile-controls {
+    position: fixed; bottom: 16px; right: 16px; z-index: 50;
+    display: none; pointer-events: all;
+    gap: 8px;
+  }
+  #mobile-controls.show { display: flex; }
+  .touch-btn {
+    width: 64px; height: 64px;
+    border: 2px solid rgba(0,255,0,0.5);
+    background: rgba(0,255,0,0.08);
+    color: #0f0;
+    font-size: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+  .touch-btn:active { background: rgba(0,255,0,0.25); border-color: #0f0; }
+  #touch-up { margin-bottom: 4px; }
+  @media(max-width:600px){
+    .touch-btn { width: 56px; height: 56px; font-size: 24px; }
+  }
 </style>
 </head>
 <body>
@@ -78,7 +101,17 @@
     <button class="btn btn-small char-btn" data-shape="stickman" style="padding:8px 14px">STICKMAN</button>
   </div>
   <div id="hi"></div>
+  <button class="btn btn-small" id="mobile-toggle" style="margin-top:16px;border-color:rgba(0,255,0,0.3);color:rgba(0,255,0,0.3)">MOBILE CONTROLS: OFF</button>
   <div id="hint">STEER: A/D OR ←→ &nbsp; JUMP: SPACE/W/↑ &nbsp; +1 JUMP EVERY 200 PTS</div>
+</div>
+<div id="mobile-controls">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+    <div class="touch-btn" id="touch-up">↑</div>
+    <div style="display:flex;gap:6px">
+      <div class="touch-btn" id="touch-left">←</div>
+      <div class="touch-btn" id="touch-right">→</div>
+    </div>
+  </div>
 </div>
 <div class="screen hide" id="mp-screen">
   <h1 style="font-size:36px;margin-bottom:8px">INCLINE</h1>
@@ -1293,10 +1326,30 @@ document.addEventListener('keyup', e=>{
   if(e.key==='ArrowRight') keysArrow.r=false;
   syncKeys();
 });
-document.addEventListener('touchstart', e=>{
-  if(e.touches[0].clientX < innerWidth/2) keys.l1=true; else keys.r1=true;
-},{passive:true});
-document.addEventListener('touchend', ()=>{keys.l1=false;keys.r1=false;keys.l2=false;keys.r2=false;},{passive:true});
+// Mobile controls
+let mobileOn=false;
+const mobileEl=document.getElementById('mobile-controls');
+const mobileToggle=document.getElementById('mobile-toggle');
+mobileToggle.addEventListener('click',()=>{
+  mobileOn=!mobileOn;
+  mobileEl.classList.toggle('show',mobileOn);
+  mobileToggle.textContent='MOBILE CONTROLS: '+(mobileOn?'ON':'OFF');
+  mobileToggle.style.borderColor=mobileOn?'#0f0':'rgba(0,255,0,0.3)';
+  mobileToggle.style.color=mobileOn?'#0f0':'rgba(0,255,0,0.3)';
+});
+
+function addTouchBtn(id, onDown, onUp){
+  const el=document.getElementById(id);
+  el.addEventListener('touchstart',e=>{e.preventDefault();onDown();},{passive:false});
+  el.addEventListener('touchend',e=>{e.preventDefault();onUp();},{passive:false});
+  el.addEventListener('touchcancel',e=>{e.preventDefault();onUp();},{passive:false});
+  el.addEventListener('mousedown',e=>{e.preventDefault();onDown();});
+  el.addEventListener('mouseup',e=>{e.preventDefault();onUp();});
+  el.addEventListener('mouseleave',e=>{onUp();});
+}
+addTouchBtn('touch-left',()=>{keysArrow.l=true;syncKeys();},()=>{keysArrow.l=false;syncKeys();});
+addTouchBtn('touch-right',()=>{keysArrow.r=true;syncKeys();},()=>{keysArrow.r=false;syncKeys();});
+addTouchBtn('touch-up',()=>{jumpQueue++;},()=>{});
 
 function startGame(mode){
   gameMode = mode;
