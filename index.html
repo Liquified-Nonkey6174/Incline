@@ -74,12 +74,14 @@
   <div class="mode-label">ONLINE</div>
   <button class="btn" style="border-color:#4488ff;color:#4488ff" id="play-online">MULTIPLAYER</button>
   <div class="mode-label" style="margin-top:20px">CHARACTER</div>
+  <div id="char-desc" style="font-size:7px;color:rgba(0,255,0,0.3);letter-spacing:1px;margin-bottom:8px;text-align:center;min-height:14px">STANDARD</div>
   <div class="btn-row" id="char-row">
     <button class="btn btn-small char-btn active" data-shape="ball" style="border-color:#0f0;color:#0f0;padding:8px 14px">BALL</button>
     <button class="btn btn-small char-btn" data-shape="cube" style="padding:8px 14px">CUBE</button>
     <button class="btn btn-small char-btn" data-shape="pyramid" style="padding:8px 14px">PYRAMID</button>
     <button class="btn btn-small char-btn" data-shape="cylinder" style="padding:8px 14px">CYLINDER</button>
     <button class="btn btn-small char-btn" data-shape="stickman" style="padding:8px 14px">STICKMAN</button>
+    <button class="btn btn-small char-btn" data-shape="cat" style="padding:8px 14px">CAT</button>
   </div>
   <div id="hi"></div>
   <div class="mode-label" style="margin-top:20px">LEADERBOARD</div>
@@ -197,6 +199,15 @@ let keys={l1:false,r1:false,l2:false,r2:false}; // 1=A/D, 2=arrows
 let lastT=0, shake=0;
 let loopRunning=false;
 let selectedShape='ball';
+const charDesc=document.getElementById('char-desc');
+const CHAR_DESCS={
+  ball:'STANDARD',
+  cube:'STANDARD',
+  pyramid:'STANDARD',
+  cylinder:'STANDARD',
+  stickman:'THIN HITBOX · 0.7x SPEED · 0.6x JUMP HEIGHT',
+  cat:'THIN HITBOX · 1.5x SPEED · 2x JUMP HEIGHT'
+};
 
 // Character selection
 document.querySelectorAll('.char-btn').forEach(btn=>{
@@ -204,6 +215,7 @@ document.querySelectorAll('.char-btn').forEach(btn=>{
     document.querySelectorAll('.char-btn').forEach(b=>{b.style.borderColor='rgba(0,255,0,0.3)';b.style.color='rgba(0,255,0,0.3)';});
     btn.style.borderColor='#0f0';btn.style.color='#0f0';
     selectedShape=btn.dataset.shape;
+    charDesc.textContent=CHAR_DESCS[selectedShape]||'STANDARD';
     // Update preview ball on title screen
     if(b1.mesh){scene.remove(b1.mesh);}
     b1.mesh=makeBallMesh(G, selectedShape);
@@ -447,6 +459,46 @@ function makeBallMesh(color, shape){
     group.userData.shape='stickman';
     group.userData.arms=arms;
     group.userData.legs=legs;
+    return group;
+  }
+  if(shape==='cat'){
+    const group = new THREE.Group();
+    // Body - horizontal along Z (forward)
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(R*0.35, R*0.35, R*1.6, 6), mat.clone());
+    body.rotation.x = Math.PI/2;
+    body.position.y = R*0.55;
+    group.add(body);
+    // Head - in front
+    const head = new THREE.Mesh(new THREE.SphereGeometry(R*0.35, 6, 5), mat.clone());
+    head.position.set(0, R*0.8, -R*0.9);
+    group.add(head);
+    // Ears
+    for(let s=-1;s<=1;s+=2){
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(R*0.12, R*0.3, 3), mat.clone());
+      ear.position.set(s*R*0.2, R*1.15, -R*0.9);
+      group.add(ear);
+    }
+    // Tail - behind
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(R*0.04, R*0.04, R*1.0, 4), mat.clone());
+    tail.position.set(0, R*0.9, R*1.1);
+    tail.rotation.x = -0.6;
+    group.add(tail);
+    // 4 Legs: front pair at -Z, back pair at +Z
+    const catLegs = [];
+    const legPos = [[R*0.2,0,-R*0.55],[-R*0.2,0,-R*0.55],[R*0.2,0,R*0.55],[-R*0.2,0,R*0.55]];
+    for(const lp of legPos){
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(R*0.06, R*0.06, R*0.6, 4), mat.clone());
+      leg.position.set(lp[0], lp[1], lp[2]);
+      group.add(leg);
+      catLegs.push(leg);
+    }
+    // Glow
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(R*0.25, 6, 4), innerMat);
+    glow.position.y = R*0.55;
+    group.add(glow);
+    group.userData.shape='cat';
+    group.userData.legs=catLegs;
+    group.userData.tail=tail;
     return group;
   }
   // Default ball
@@ -1253,29 +1305,53 @@ function updateBall(b, kl, kr, dt){
     const prevBounce = b.mesh.userData.lastBounce || 0;
     b.mesh.children.forEach(c=>{ c.position.y += bounce - prevBounce; });
     b.mesh.userData.lastBounce = bounce;
+  } else if(sh==='cat'){
+    // Cat running - front and back legs alternate, tail sways
+    const t = performance.now() * 0.005 * Math.min(3, Math.max(1, speed * 0.03));
+    const frontSwing = Math.sin(t) * 1.0;
+    const backSwing = Math.sin(t + Math.PI) * 1.0;
+    const legs = b.mesh.userData.legs;
+    if(legs && legs.length===4){
+      legs[0].rotation.x = frontSwing;
+      legs[1].rotation.x = frontSwing;
+      legs[2].rotation.x = backSwing;
+      legs[3].rotation.x = backSwing;
+    }
+    const tail = b.mesh.userData.tail;
+    if(tail) tail.rotation.z = Math.sin(t * 0.7) * 0.4;
+    const bounce = Math.abs(Math.sin(t)) * 0.1;
+    const prevBounce = b.mesh.userData.lastBounce || 0;
+    b.mesh.children.forEach(c=>{ c.position.y += bounce - prevBounce; });
+    b.mesh.userData.lastBounce = bounce;
+    b.mesh.rotation.x = 0;
+    b.mesh.rotation.y = 0;
+    b.mesh.rotation.z = -b.vx * 0.015;
   } else {
     // Default ball roll
     b.mesh.rotation.x -= speed * dt / (CFG.ballR * 3);
     b.mesh.rotation.z -= b.vx * dt * 0.15;
   }
 
-  // JUMP - per-ball jump handling
+  // JUMP - per-ball jump handling with character multipliers
+  // Cat: 2x height (sqrt(2) vel), Stickman: 0.6x height (sqrt(0.6) vel)
+  const bShape = b.mesh.userData.shape;
+  const jmpMult = bShape==='cat' ? Math.sqrt(2) : bShape==='stickman' ? Math.sqrt(0.6) : 1.0;
   if(b === b1 && jumpQueue > 0 && jumpsRemaining > 0){
-    b.vy = JUMP_VEL;
+    b.vy = JUMP_VEL * jmpMult;
     jumpsRemaining--;
     jumpQueue--;
     jumpCountEl.textContent = jumpsRemaining;
   }
   if(b === b1) jumpQueue = 0;
   if(b === b2 && jumpQueue2 > 0 && jumpsRemaining2 > 0){
-    b.vy = JUMP_VEL;
+    b.vy = JUMP_VEL * jmpMult;
     jumpsRemaining2--;
     jumpQueue2--;
     jumpCountEl2.textContent = jumpsRemaining2;
   }
   if(b === b2) jumpQueue2 = 0;
 
-  const shrink = (b.mesh.userData.shape==='stickman') ? CFG.ballR*0.55 : 0;
+  const shrink = (b.mesh.userData.shape==='stickman'||b.mesh.userData.shape==='cat') ? CFG.ballR*0.55 : 0;
   return checkColAt(b.px, b.py, -dist, shrink);
 }
 
@@ -1288,7 +1364,9 @@ function loop(ts){
 
   if(running){
     syncKeys();
-    speed += (CFG.spdUp + speed * 0.003) * 0.6 * dt;
+    // Character speed multiplier
+    const spdMult = selectedShape==='cat' ? 1.5 : selectedShape==='stickman' ? 0.7 : 1.0;
+    speed += (CFG.spdUp + speed * 0.003) * 0.6 * spdMult * dt;
     dist += speed * dt;
 
     // Speedtunnel global boost
