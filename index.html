@@ -1293,23 +1293,24 @@ document.addEventListener('keyup', e=>{
   if(e.key==='ArrowRight') keysArrow.r=false;
   syncKeys();
 });
-// Touch controls: left/right half = steer, swipe up = jump
-let touchStartY=0;
+// Touch controls: left/right half = steer, swipe up = jump (one per touch)
+let touchStartY=0, touchJumped=false;
 document.addEventListener('touchstart', e=>{
   if(!running) return;
   const t=e.touches[0];
   touchStartY=t.clientY;
+  touchJumped=false;
   if(t.clientX < innerWidth/2){ keysArrow.l=true; } else { keysArrow.r=true; }
   syncKeys();
 },{passive:true});
 document.addEventListener('touchmove', e=>{
-  if(!running) return;
-  const t=e.touches[0];
-  const dy=touchStartY - t.clientY;
-  if(dy > 30){ jumpQueue++; touchStartY=t.clientY; }
+  if(!running||touchJumped) return;
+  const dy=touchStartY - e.touches[0].clientY;
+  if(dy > 40){ jumpQueue++; touchJumped=true; }
 },{passive:true});
 document.addEventListener('touchend', ()=>{
   keysArrow.l=false; keysArrow.r=false;
+  touchJumped=false;
   syncKeys();
 },{passive:true});
 
