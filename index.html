@@ -54,6 +54,10 @@
     <div id="jump-count" style="font-size:18px;color:#0f0;font-family:'Press Start 2P',monospace">1</div>
     <div>JUMPS</div>
   </div>
+  <div id="jump-display2" style="position:absolute;top:20px;left:20px;font-size:9px;color:rgba(0,255,0,0.5);letter-spacing:2px;text-align:left;display:none">
+    <div id="jump-count2" style="font-size:18px;color:#0f0;font-family:'Press Start 2P',monospace">1</div>
+    <div>JUMPS</div>
+  </div>
   <div id="ball-status">
     <div id="b1-status" class="alive">● A/D</div>
     <div id="b2-status" class="alive" style="margin-top:4px">● ←→</div>
@@ -78,7 +82,22 @@
     <button class="btn btn-small char-btn" data-shape="stickman" style="padding:8px 14px">STICKMAN</button>
   </div>
   <div id="hi"></div>
+  <div class="mode-label" style="margin-top:20px">LEADERBOARD</div>
+  <div id="leaderboard" style="font-size:9px;letter-spacing:1px;min-height:30px;margin-bottom:8px;width:100%;max-width:340px;text-align:center"></div>
+  <button class="btn btn-small" id="admin-toggle" style="border-color:rgba(0,255,0,0.15);color:rgba(0,255,0,0.15);font-size:7px;padding:4px 12px">ADMIN</button>
+  <div id="admin-panel" style="display:none;margin-top:8px;text-align:center">
+    <input id="admin-pw" type="password" placeholder="PASSWORD" style="font-family:'Press Start 2P',monospace;font-size:8px;background:transparent;border:1px solid rgba(255,0,0,0.3);color:#f22;text-align:center;width:140px;padding:4px;outline:none">
+    <div id="admin-list" style="margin-top:8px;font-size:8px"></div>
+  </div>
   <div id="hint">STEER: A/D OR ←→ &nbsp; JUMP: SPACE/W/↑ &nbsp; MOBILE: TAP SIDES + SWIPE UP</div>
+</div>
+<!-- Score name entry popup -->
+<div class="screen hide" id="name-screen" style="background:rgba(0,0,0,0.92);justify-content:center">
+  <h2 style="color:#0f0;font-size:20px;margin-bottom:8px">NEW HIGH SCORE!</h2>
+  <div id="new-score-val" style="font-size:36px;color:#0f0;font-family:'Press Start 2P',monospace;margin-bottom:20px">0</div>
+  <div class="mode-label">ENTER YOUR NAME</div>
+  <input id="score-name-input" maxlength="20" placeholder="YOUR NAME" autocomplete="off" spellcheck="false" style="font-family:'Press Start 2P',monospace;font-size:16px;letter-spacing:3px;background:transparent;border:none;border-bottom:2px solid #0f0;color:#0f0;text-align:center;width:260px;outline:none;text-transform:uppercase">
+  <button class="btn" id="submit-score-btn" style="margin-top:20px">SUBMIT</button>
 </div>
 <div class="screen hide" id="mp-screen">
   <h1 style="font-size:36px;margin-bottom:8px">INCLINE</h1>
@@ -193,16 +212,18 @@ document.querySelectorAll('.char-btn').forEach(btn=>{
     scene.add(b1.mesh);
   });
 });
-let jumpsRemaining=1, lastJumpMilestone=0;
+let jumpsRemaining=1, jumpsRemaining2=1, lastJumpMilestone=0;
 const JUMP_HEIGHT = 2.4; // 2x red block height (~1.2)
 const JUMP_VEL = Math.sqrt(2 * 28 * JUMP_HEIGHT); // v = sqrt(2*g*h)
 const jumpCountEl=document.getElementById('jump-count');
+const jumpCountEl2=document.getElementById('jump-count2');
+const jumpDisplay2=document.getElementById('jump-display2');
 const JUMP_COLORS = [
   0xffffff, // 0: white
-  0xffdd00, // 1: yellow
-  0xff9900, // 2: orange
-  0xff2222, // 3: red
-  0x4488ff, // 4: blue
+  0x00ff00, // 1: green
+  0xffdd00, // 2: yellow
+  0xff9900, // 3: orange
+  0xff2222, // 4: red
 ];
 const RAINBOW = [0xff0000,0xff8800,0xffff00,0x00ff00,0x0088ff,0x4400ff,0xaa00ff];
 function updateBallColor(bMesh, jumps){
@@ -247,6 +268,103 @@ function updateHiDisplay(){
   hiEl.textContent=parts.join('  ');
 }
 updateHiDisplay();
+
+// =========== LEADERBOARD ===========
+const ADMIN_PW = 'cintowin';
+const MAX_LEADERBOARD = 10;
+const FB_URL = 'https://inclineleaderboard-default-rtdb.asia-southeast1.firebasedatabase.app';
+let leaderboard = [];
+let pendingScore = 0;
+
+const lbEl = document.getElementById('leaderboard');
+const adminToggle = document.getElementById('admin-toggle');
+const adminPanel = document.getElementById('admin-panel');
+const adminPw = document.getElementById('admin-pw');
+const adminList = document.getElementById('admin-list');
+const nameScreen = document.getElementById('name-screen');
+const newScoreVal = document.getElementById('new-score-val');
+const scoreNameInput = document.getElementById('score-name-input');
+const submitScoreBtn = document.getElementById('submit-score-btn');
+
+async function loadLeaderboard(){
+  try{
+    const res = await fetch(FB_URL+'/leaderboard.json');
+    const data = await res.json();
+    if(data){
+      leaderboard = Object.entries(data).map(([k,v])=>({...v,fbKey:k}));
+      leaderboard.sort((a,b)=>b.score-a.score);
+    } else { leaderboard=[]; }
+  }catch(e){ leaderboard=[]; }
+  renderLeaderboard();
+}
+async function saveScore(name, sc){
+  try{
+    const entry = {name:name.toUpperCase().slice(0,20), score:sc, time:Date.now()};
+    await fetch(FB_URL+'/leaderboard.json',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(entry)
+    });
+    await loadLeaderboard();
+    // Trim to top scores
+    if(leaderboard.length > MAX_LEADERBOARD){
+      const toRemove = leaderboard.slice(MAX_LEADERBOARD);
+      for(const e of toRemove){
+        if(e.fbKey) await fetch(FB_URL+'/leaderboard/'+e.fbKey+'.json',{method:'DELETE'});
+      }
+      await loadLeaderboard();
+    }
+  }catch(e){ console.error('Save failed',e); }
+}
+async function deleteScore(fbKey){
+  try{
+    await fetch(FB_URL+'/leaderboard/'+fbKey+'.json',{method:'DELETE'});
+    await loadLeaderboard();
+    renderAdminList();
+  }catch(e){}
+}
+function isLeaderboardWorthy(sc){
+  if(leaderboard.length < MAX_LEADERBOARD) return true;
+  return sc > leaderboard[leaderboard.length-1].score;
+}
+function renderLeaderboard(){
+  if(leaderboard.length===0){ lbEl.innerHTML='<div style="color:rgba(0,255,0,0.2)">NO SCORES YET</div>'; return; }
+  lbEl.innerHTML = leaderboard.slice(0,MAX_LEADERBOARD).map((e,i)=>{
+    const medal = i===0?'&#x1F451; ':i===1?'&#x1F948; ':i===2?'&#x1F949; ':'';
+    const col = i===0?'#ffdd00':i===1?'#aaaacc':i===2?'#cc8844':'rgba(0,255,0,0.5)';
+    return '<div style="color:'+col+';margin:3px 0">'+medal+(i+1)+'. '+e.name+' &mdash; '+e.score+'</div>';
+  }).join('');
+}
+function renderAdminList(){
+  if(adminPw.value !== ADMIN_PW){ adminList.innerHTML='<div style="color:rgba(255,0,0,0.3)">WRONG PASSWORD</div>'; return; }
+  adminList.innerHTML = leaderboard.map((e,i)=>
+    '<div style="color:rgba(255,0,0,0.5);margin:3px 0;cursor:pointer" data-key="'+e.fbKey+'">&#x2715; '+(i+1)+'. '+e.name+' &mdash; '+e.score+'</div>'
+  ).join('');
+  adminList.querySelectorAll('[data-key]').forEach(el=>{
+    el.addEventListener('click',()=>{ deleteScore(el.dataset.key); });
+  });
+}
+
+adminToggle.addEventListener('click',()=>{
+  adminPanel.style.display = adminPanel.style.display==='none'?'block':'none';
+});
+adminPw.addEventListener('input', renderAdminList);
+
+submitScoreBtn.addEventListener('click', async ()=>{
+  const name = scoreNameInput.value.trim().toUpperCase() || 'ANON';
+  submitScoreBtn.textContent='SAVING...';
+  submitScoreBtn.disabled=true;
+  await saveScore(name, pendingScore);
+  submitScoreBtn.textContent='SUBMIT';
+  submitScoreBtn.disabled=false;
+  nameScreen.classList.remove('show'); nameScreen.classList.add('hide');
+  osEl.classList.remove('hide'); osEl.classList.add('show');
+});
+scoreNameInput.addEventListener('keydown',e=>{
+  if(e.key==='Enter') submitScoreBtn.click();
+});
+
+loadLeaderboard();
 
 // =========== MATERIALS ===========
 const gWire = (op=0.12) => new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:op});
@@ -851,13 +969,17 @@ const SET_GAP = 1.5;     // between different obstacle type sets
 const TUNNEL_GAP = 2.5;  // before/after speedtunnel
 
 function genSet(type, count){
-  // Thin obstacles (straight, snake) are always solo
   const isSolo = (type === 'straight' || type === 'snake' || type === 'tunnel');
   const n = isSolo ? 1 : count;
   for(let i=0; i<n; i++){
     const used = generateObstacle(type);
     genZ -= used;
-    if(i < n-1) genZ -= SEAM_GAP; // tiny gap between same-type
+    // Always follow a tunnel with a snake
+    if(type === 'tunnel'){
+      genZ -= SEAM_GAP;
+      genZ -= generateObstacle('snake');
+    }
+    if(i < n-1) genZ -= SEAM_GAP;
   }
 }
 
@@ -925,8 +1047,10 @@ function reset(){
 
   score=0; speed=CFG.baseSpd; dist=0;
   genZ=0; sectionNum=0; shake=0; dead=false;
-  jumpsRemaining=1; lastJumpMilestone=0;
+  jumpsRemaining=1; jumpsRemaining2=1; lastJumpMilestone=0;
   jumpCountEl.textContent='1';
+  jumpCountEl2.textContent='1';
+  jumpDisplay2.style.display = isDual ? 'block' : 'none';
 
   makePlatform(-10, 30, CFG.tw);
   genZ = -25.3;
@@ -964,7 +1088,17 @@ function gameOver(){
     nbEl.style.display = 'block';
     updateHiDisplay();
   }
-  setTimeout(()=>{ osEl.classList.remove('hide'); osEl.classList.add('show'); }, 600);
+  if(gameMode === 'solo' && isLeaderboardWorthy(fs)){
+    pendingScore = fs;
+    newScoreVal.textContent = fs;
+    scoreNameInput.value = '';
+    setTimeout(()=>{
+      nameScreen.classList.remove('hide'); nameScreen.classList.add('show');
+      scoreNameInput.focus();
+    }, 600);
+  } else {
+    setTimeout(()=>{ osEl.classList.remove('hide'); osEl.classList.add('show'); }, 600);
+  }
 }
 
 function isOnPlatformAt(bx, bz){
@@ -1093,10 +1227,9 @@ function updateBall(b, kl, kr, dt){
     b.mesh.rotation.x += speed * dt / CFG.ballR;
   } else if(sh==='stickman'){
     // Exaggerated running animation
-    const t = performance.now() * 0.004 * Math.max(1, speed * 0.06);
+    const t = performance.now() * 0.004 * Math.min(3, Math.max(1, speed * 0.03));
     const legSwing = Math.sin(t) * 1.4;
     const armSwing = Math.sin(t) * 1.2;
-    const bounce = Math.abs(Math.sin(t)) * 0.15;
     const arms = b.mesh.userData.arms;
     const legs = b.mesh.userData.legs;
     if(legs&&legs.length===2){
@@ -1110,26 +1243,36 @@ function updateBall(b, kl, kr, dt){
       arms[0].rotation.z = -0.3 + Math.abs(armSwing)*0.2;
       arms[1].rotation.z = 0.3 - Math.abs(armSwing)*0.2;
     }
-    // Slight forward lean + bounce + lean into turns
+    // Slight forward lean + lean into turns
     b.mesh.rotation.x = -0.15;
     b.mesh.rotation.y = 0;
     b.mesh.rotation.z = -b.vx * 0.02;
-    b.mesh.position.y += bounce;
+    // Bounce is visual only - offset children without affecting camera
+    const bounce = Math.abs(Math.sin(t)) * 0.15;
+    const prevBounce = b.mesh.userData.lastBounce || 0;
+    b.mesh.children.forEach(c=>{ c.position.y += bounce - prevBounce; });
+    b.mesh.userData.lastBounce = bounce;
   } else {
     // Default ball roll
-    b.mesh.rotation.x -= speed * dt / CFG.ballR;
-    b.mesh.rotation.z -= b.vx * dt * 0.3;
+    b.mesh.rotation.x -= speed * dt / (CFG.ballR * 3);
+    b.mesh.rotation.z -= b.vx * dt * 0.15;
   }
 
-  // JUMP - can jump anytime (ground or air) if jumps available
-  if(jumpQueue > 0 && jumpsRemaining > 0 && b === b1){
+  // JUMP - per-ball jump handling
+  if(b === b1 && jumpQueue > 0 && jumpsRemaining > 0){
     b.vy = JUMP_VEL;
     jumpsRemaining--;
     jumpQueue--;
     jumpCountEl.textContent = jumpsRemaining;
-    b.mesh.position.y = b.py;
   }
-  if(b === b1) jumpQueue = 0; // clear any excess queued jumps
+  if(b === b1) jumpQueue = 0;
+  if(b === b2 && jumpQueue2 > 0 && jumpsRemaining2 > 0){
+    b.vy = JUMP_VEL;
+    jumpsRemaining2--;
+    jumpQueue2--;
+    jumpCountEl2.textContent = jumpsRemaining2;
+  }
+  if(b === b2) jumpQueue2 = 0;
 
   return checkColAt(b.px, b.py, -dist);
 }
@@ -1143,7 +1286,7 @@ function loop(ts){
 
   if(running){
     syncKeys();
-    speed += (CFG.spdUp + speed * 0.003) * dt;
+    speed += (CFG.spdUp + speed * 0.003) * 0.6 * dt;
     dist += speed * dt;
 
     // Speedtunnel global boost
@@ -1199,13 +1342,17 @@ function loop(ts){
     // Award a jump every 200 points
     const milestone = Math.floor(score / 200);
     if(milestone > lastJumpMilestone){
-      jumpsRemaining += (milestone - lastJumpMilestone);
+      const bonus = milestone - lastJumpMilestone;
+      jumpsRemaining += bonus;
+      jumpsRemaining2 += bonus;
       lastJumpMilestone = milestone;
       jumpCountEl.textContent = jumpsRemaining;
+      jumpCountEl2.textContent = jumpsRemaining2;
     }
 
-    // Update ball color based on jumps
+    // Update ball colors based on their own jump counts
     if(b1.alive) updateBallColor(b1.mesh, jumpsRemaining);
+    if((gameMode==='dual_last'||gameMode==='dual_linked') && b2.alive) updateBallColor(b2.mesh, jumpsRemaining2);
     updateMovingObs(now);
     while(genZ > -dist - 250) generateSection();
 
@@ -1258,7 +1405,7 @@ function loop(ts){
 
 // =========== INPUT ===========
 let keysAD={l:false,r:false}, keysArrow={l:false,r:false};
-let jumpQueue=0; // number of jump presses queued
+let jumpQueue=0, jumpQueue2=0;
 function syncKeys(){
   if(gameMode==='solo'||gameMode==='online'){
     keys.l1=keysAD.l||keysArrow.l; keys.r1=keysAD.r||keysArrow.r;
@@ -1281,8 +1428,12 @@ document.addEventListener('keydown', e=>{
   if(e.key==='d'||e.key==='D') keysAD.r=true;
   if(e.key==='ArrowLeft') keysArrow.l=true;
   if(e.key==='ArrowRight') keysArrow.r=true;
-  if(e.key===' '||e.key==='w'||e.key==='W'||e.key==='ArrowUp'){
+  if(e.key===' '||e.key==='w'||e.key==='W'){
     jumpQueue++;
+  }
+  if(e.key==='ArrowUp'){
+    if(gameMode==='dual_last'||gameMode==='dual_linked') jumpQueue2++;
+    else jumpQueue++;
   }
   syncKeys();
 });
@@ -1325,10 +1476,13 @@ document.getElementById('play-solo').addEventListener('click',()=>startGame('sol
 document.getElementById('play-last').addEventListener('click',()=>startGame('dual_last'));
 document.getElementById('play-linked').addEventListener('click',()=>startGame('dual_linked'));
 document.getElementById('re-btn').addEventListener('click',()=>{
-  osEl.classList.remove('show'); osEl.classList.add('hide'); reset();
+  osEl.classList.remove('show'); osEl.classList.add('hide');
+  nameScreen.classList.remove('show'); nameScreen.classList.add('hide');
+  reset();
 });
 document.getElementById('menu-btn').addEventListener('click',()=>{
   osEl.classList.remove('show'); osEl.classList.add('hide');
+  nameScreen.classList.remove('show'); nameScreen.classList.add('hide');
   if(mpMode) cleanupMp();
   running=false; dead=false;
   ssEl.style.display='flex'; ssEl.classList.remove('hidden');
