@@ -84,8 +84,12 @@
     <button class="btn btn-small char-btn" data-shape="cat" style="padding:8px 14px">CAT</button>
   </div>
   <div id="hi"></div>
-  <div class="mode-label" style="margin-top:20px">LEADERBOARD</div>
-  <div id="leaderboard" style="font-size:9px;letter-spacing:1px;min-height:30px;margin-bottom:8px;width:100%;max-width:340px;text-align:center"></div>
+  <div class="mode-label" style="margin-top:20px">LEADERBOARD — SOLO</div>
+  <div id="leaderboard-solo" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;margin-bottom:8px;width:100%;max-width:340px;text-align:center"></div>
+  <div class="mode-label">LEADERBOARD — LAST STAND</div>
+  <div id="leaderboard-dual_last" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;margin-bottom:8px;width:100%;max-width:340px;text-align:center"></div>
+  <div class="mode-label">LEADERBOARD — LINKED</div>
+  <div id="leaderboard-dual_linked" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;margin-bottom:8px;width:100%;max-width:340px;text-align:center"></div>
   <button class="btn btn-small" id="admin-toggle" style="border-color:rgba(0,255,0,0.15);color:rgba(0,255,0,0.15);font-size:7px;padding:4px 12px">ADMIN</button>
   <div id="admin-panel" style="display:none;margin-top:8px;text-align:center">
     <input id="admin-pw" type="password" placeholder="PASSWORD" style="font-family:'Press Start 2P',monospace;font-size:8px;background:transparent;border:1px solid rgba(255,0,0,0.3);color:#f22;text-align:center;width:140px;padding:4px;outline:none">
@@ -178,7 +182,7 @@ const CFG = {
   baseSpd: 22,
   maxSpd: 999,
   spdUp: 0.5,
-  steer: 156,
+  steer: 190,
   damp: 0.84,
   platLen: 14,
   platGap: 5,
@@ -225,6 +229,7 @@ document.querySelectorAll('.char-btn').forEach(btn=>{
   });
 });
 let jumpsRemaining=1, jumpsRemaining2=1, lastJumpMilestone=0;
+
 const JUMP_HEIGHT = 2.4; // 2x red block height (~1.2)
 const JUMP_VEL = Math.sqrt(2 * 28 * JUMP_HEIGHT); // v = sqrt(2*g*h)
 const jumpCountEl=document.getElementById('jump-count');
@@ -253,8 +258,11 @@ function updateBallColor(bMesh, jumps){
   });
 }
 let platforms=[], activeObs=[], bgBuilds=[];
+let slowOrbs=[]; // {mesh, parent, collected}
+let speedtunnelCount=0;
 let genZ=0;
 let sectionNum=0;
+
 
 const sEl=document.getElementById('score-val');
 const secEl=document.getElementById('section-label');
@@ -283,12 +291,13 @@ updateHiDisplay();
 
 // =========== LEADERBOARD ===========
 const ADMIN_PW = 'cintowin';
-const MAX_LEADERBOARD = 10;
+const MAX_LEADERBOARD = 50;
 const FB_URL = 'https://inclineleaderboard-default-rtdb.asia-southeast1.firebasedatabase.app';
-let leaderboard = [];
+const LB_MODES = ['solo','dual_last','dual_linked'];
+let leaderboards = {solo:[], dual_last:[], dual_linked:[]};
 let pendingScore = 0;
+let pendingMode = 'solo';
 
-const lbEl = document.getElementById('leaderboard');
 const adminToggle = document.getElementById('admin-toggle');
 const adminPanel = document.getElementById('admin-panel');
 const adminPw = document.getElementById('admin-pw');
@@ -298,50 +307,68 @@ const newScoreVal = document.getElementById('new-score-val');
 const scoreNameInput = document.getElementById('score-name-input');
 const submitScoreBtn = document.getElementById('submit-score-btn');
 
-async function loadLeaderboard(){
+async function loadLeaderboard(mode){
   try{
-    const res = await fetch(FB_URL+'/leaderboard.json');
+    const res = await fetch(FB_URL+'/lb_'+mode+'.json');
     const data = await res.json();
     if(data){
-      leaderboard = Object.entries(data).map(([k,v])=>({...v,fbKey:k}));
-      leaderboard.sort((a,b)=>b.score-a.score);
-    } else { leaderboard=[]; }
-  }catch(e){ leaderboard=[]; }
-  renderLeaderboard();
+      leaderboards[mode] = Object.entries(data).map(([k,v])=>({...v,fbKey:k}));
+      leaderboards[mode].sort((a,b)=>b.score-a.score);
+    } else { leaderboards[mode]=[]; }
+  }catch(e){ leaderboards[mode]=[]; }
+  renderLeaderboard(mode);
 }
-async function saveScore(name, sc){
+async function loadAllLeaderboards(){
+  for(const m of LB_MODES) await loadLeaderboard(m);
+}
+async function saveScore(mode, name, sc){
   try{
-    const entry = {name:name.toUpperCase().slice(0,20), score:sc, time:Date.now()};
-    await fetch(FB_URL+'/leaderboard.json',{
+    const cleanName = name.toUpperCase().slice(0,20);
+    await loadLeaderboard(mode);
+    // Check if this person already has a score
+    const existing = leaderboards[mode].find(e => e.name === cleanName);
+    if(existing){
+      if(sc <= existing.score) return; // not a PB, skip
+      // Delete old score, we'll add the new one
+      if(existing.fbKey) await fetch(FB_URL+'/lb_'+mode+'/'+existing.fbKey+'.json',{method:'DELETE'});
+    }
+    const entry = {name:cleanName, score:sc, time:Date.now()};
+    await fetch(FB_URL+'/lb_'+mode+'.json',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify(entry)
     });
-    await loadLeaderboard();
+    await loadLeaderboard(mode);
     // Trim to top scores
-    if(leaderboard.length > MAX_LEADERBOARD){
-      const toRemove = leaderboard.slice(MAX_LEADERBOARD);
+    if(leaderboards[mode].length > MAX_LEADERBOARD){
+      const toRemove = leaderboards[mode].slice(MAX_LEADERBOARD);
       for(const e of toRemove){
-        if(e.fbKey) await fetch(FB_URL+'/leaderboard/'+e.fbKey+'.json',{method:'DELETE'});
+        if(e.fbKey) await fetch(FB_URL+'/lb_'+mode+'/'+e.fbKey+'.json',{method:'DELETE'});
       }
-      await loadLeaderboard();
+      await loadLeaderboard(mode);
     }
   }catch(e){ console.error('Save failed',e); }
 }
-async function deleteScore(fbKey){
+async function deleteScore(mode, fbKey){
   try{
-    await fetch(FB_URL+'/leaderboard/'+fbKey+'.json',{method:'DELETE'});
-    await loadLeaderboard();
+    await fetch(FB_URL+'/lb_'+mode+'/'+fbKey+'.json',{method:'DELETE'});
+    await loadLeaderboard(mode);
     renderAdminList();
   }catch(e){}
 }
-function isLeaderboardWorthy(sc){
-  if(leaderboard.length < MAX_LEADERBOARD) return true;
-  return sc > leaderboard[leaderboard.length-1].score;
+function isLeaderboardWorthy(mode, sc){
+  const lb = leaderboards[mode];
+  if(lb.length < MAX_LEADERBOARD) return sc > 0;
+  // Always worthy if it beats the lowest score
+  if(sc > lb[lb.length-1].score) return true;
+  return false;
 }
-function renderLeaderboard(){
-  if(leaderboard.length===0){ lbEl.innerHTML='<div style="color:rgba(0,255,0,0.2)">NO SCORES YET</div>'; return; }
-  lbEl.innerHTML = leaderboard.slice(0,MAX_LEADERBOARD).map((e,i)=>{
+function renderLeaderboard(mode){
+  const el = document.getElementById('leaderboard-'+mode);
+  if(!el) return;
+  const lb = leaderboards[mode];
+  if(lb.length===0){ el.innerHTML='<div style="color:rgba(0,255,0,0.2)">NO SCORES YET</div>'; return; }
+  el.innerHTML = lb.slice(0,MAX_LEADERBOARD).map((e,i)=>{
     const medal = i===0?'&#x1F451; ':i===1?'&#x1F948; ':i===2?'&#x1F949; ':'';
     const col = i===0?'#ffdd00':i===1?'#aaaacc':i===2?'#cc8844':'rgba(0,255,0,0.5)';
     return '<div style="color:'+col+';margin:3px 0">'+medal+(i+1)+'. '+e.name+' &mdash; '+e.score+'</div>';
@@ -349,11 +376,17 @@ function renderLeaderboard(){
 }
 function renderAdminList(){
   if(adminPw.value !== ADMIN_PW){ adminList.innerHTML='<div style="color:rgba(255,0,0,0.3)">WRONG PASSWORD</div>'; return; }
-  adminList.innerHTML = leaderboard.map((e,i)=>
-    '<div style="color:rgba(255,0,0,0.5);margin:3px 0;cursor:pointer" data-key="'+e.fbKey+'">&#x2715; '+(i+1)+'. '+e.name+' &mdash; '+e.score+'</div>'
-  ).join('');
+  let html='';
+  for(const mode of LB_MODES){
+    const label = mode==='solo'?'SOLO':mode==='dual_last'?'LAST STAND':'LINKED';
+    html+='<div style="color:rgba(255,0,0,0.4);margin:8px 0 4px;font-size:7px">--- '+label+' ---</div>';
+    html+=leaderboards[mode].map((e,i)=>
+      '<div style="color:rgba(255,0,0,0.5);margin:2px 0;cursor:pointer" data-mode="'+mode+'" data-key="'+e.fbKey+'">&#x2715; '+(i+1)+'. '+e.name+' &mdash; '+e.score+'</div>'
+    ).join('');
+  }
+  adminList.innerHTML=html;
   adminList.querySelectorAll('[data-key]').forEach(el=>{
-    el.addEventListener('click',()=>{ deleteScore(el.dataset.key); });
+    el.addEventListener('click',()=>{ deleteScore(el.dataset.mode, el.dataset.key); });
   });
 }
 
@@ -366,7 +399,7 @@ submitScoreBtn.addEventListener('click', async ()=>{
   const name = scoreNameInput.value.trim().toUpperCase() || 'ANON';
   submitScoreBtn.textContent='SAVING...';
   submitScoreBtn.disabled=true;
-  await saveScore(name, pendingScore);
+  await saveScore(pendingMode, name, pendingScore);
   submitScoreBtn.textContent='SUBMIT';
   submitScoreBtn.disabled=false;
   nameScreen.classList.remove('show'); nameScreen.classList.add('hide');
@@ -376,7 +409,7 @@ scoreNameInput.addEventListener('keydown',e=>{
   if(e.key==='Enter') submitScoreBtn.click();
 });
 
-loadLeaderboard();
+loadAllLeaderboards();
 
 // =========== MATERIALS ===========
 const gWire = (op=0.12) => new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:op});
@@ -672,19 +705,10 @@ function genSlant(z){
 }
 
 function genStraight(z){
-  // Long, narrow platform with end ramp
+  // Long, narrow platform
   const len = 45;
   const w = CFG.tw * 0.32;
   const p = makePlatform(z - len/2, len, w, {thin:true, noWalls:true});
-  const fy = p.userData.fy;
-  const ramp = new THREE.Mesh(
-    new THREE.BoxGeometry(w*0.9, 0.15, 2.5),
-    new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:0.35})
-  );
-  ramp.position.set(0, fy+0.4, -len/2+2);
-  ramp.rotation.x = 0.2;
-  p.add(ramp);
-  p.userData.hasEndRamp = true;
   return len;
 }
 
@@ -827,20 +851,10 @@ function genSnake(z){
   }
 
   // Small ramp at the end
-  const last = pts[pts.length-1];
-  const ramp = new THREE.Mesh(
-    new THREE.BoxGeometry(w*0.85, 0.15, 2.5),
-    new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:0.35})
-  );
-  ramp.position.set(last.x, fy+0.4, last.z+1.2);
-  ramp.rotation.x = 0.2;
-  grp.add(ramp);
-
   grp.userData = {
     z: z - totalLen/2, length: totalLen, width: w,
     fy, slantDir: 0, isTunnel: false,
-    isSnake: true, snakeHW: hw, snakeAmplitude: amplitude,
-    hasEndRamp: true
+    isSnake: true, snakeHW: hw, snakeAmplitude: amplitude
   };
   scene.add(grp);
   platforms.push(grp);
@@ -959,14 +973,6 @@ function genSpeedtunnel(z){
     p.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(wallPts), gLine(0.5)));
   }
 
-  // Red arch at the exit end - positioned below ramp peak so you can go over
-  const archW = CFG.tw + rampW*2;
-  const archH = 3.0; // lower than rampH so the ramp clears it
-  const archTop = makeRedBlock(archW, 0.5, 1.0);
-  archTop.position.set(0, fy+0.15+archH, -hl+0.5);
-  p.add(archTop);
-  activeObs.push({mesh:archTop, parent:p, hw:archW/2, hh:0.25+CFG.ballR*0.3, hd:0.5+CFG.ballR*0.3, moving:false});
-
   // Speed boost pad on floor
   const pad = new THREE.Mesh(
     new THREE.PlaneGeometry(CFG.tw*0.5, tunnelLen*0.6),
@@ -976,19 +982,32 @@ function genSpeedtunnel(z){
   pad.position.y = fy + 0.02;
   p.add(pad);
 
-  // End ramp (the one at the very end you'd normally go over)
-  const endRamp = new THREE.Mesh(
-    new THREE.BoxGeometry(CFG.tw*0.85, 0.2, 3),
-    new THREE.MeshBasicMaterial({color:G, wireframe:true, transparent:true, opacity:0.3})
-  );
-  endRamp.position.set(0, fy+0.6, -hl+1.5);
-  endRamp.rotation.x = 0.25;
-  p.add(endRamp);
-
   p.userData.isSpeedtunnel = true;
   p.userData.rampW = rampW;
   p.userData.rampH = rampH;
   p.userData.tunnelHL = hl;
+
+  // Every 3rd speedtunnel, place a slow-down orb on one ramp
+  speedtunnelCount++;
+  if(speedtunnelCount % 4 === 0){
+    const side = rngBool() ? 1 : -1;
+    const hw = CFG.tw/2;
+    const orbX = side * (hw + rampW * 0.5);
+    const orbZ = 0; // middle of tunnel
+    const zFrac = 0.5; // halfway through
+    const orbY = fy + 0.15 + rampH * zFrac + 1.0; // floating above ramp
+    const orbGeo = new THREE.SphereGeometry(0.35, 8, 6);
+    const orbMat = new THREE.MeshBasicMaterial({color:0xaa44ff});
+    const orb = new THREE.Mesh(orbGeo, orbMat);
+    // Add glow
+    const orbGlow = new THREE.Mesh(new THREE.SphereGeometry(0.55, 6, 4),
+      new THREE.MeshBasicMaterial({color:0xaa44ff, transparent:true, opacity:0.2}));
+    orb.add(orbGlow);
+    orb.position.set(orbX, orbY, orbZ);
+    p.add(orb);
+    slowOrbs.push({mesh:orb, parent:p, collected:false, radius:0.7});
+  }
+
   return len;
 }
 
@@ -1078,6 +1097,8 @@ function reset(){
   platforms.forEach(p => scene.remove(p));
   platforms = [];
   activeObs = [];
+  slowOrbs = [];
+  speedtunnelCount = 0;
 
   b1 = makeBallState();
   b1.mesh = makeBallMesh(gameMode==='solo' ? G : gameMode==='online' ? PLAYER_COLORS[myPlayerIndex] : YELLOW);
@@ -1099,6 +1120,8 @@ function reset(){
 
   score=0; speed=CFG.baseSpd; dist=0;
   genZ=0; sectionNum=0; shake=0; dead=false;
+  
+  
   jumpsRemaining=1; jumpsRemaining2=1; lastJumpMilestone=0;
   jumpCountEl.textContent='1';
   jumpCountEl2.textContent='1';
@@ -1140,8 +1163,24 @@ function gameOver(){
     nbEl.style.display = 'block';
     updateHiDisplay();
   }
-  if(gameMode === 'solo' && isLeaderboardWorthy(fs)){
-    pendingScore = fs;
+  if(gameMode === 'solo' && isLeaderboardWorthy('solo', fs)){
+    pendingScore = fs; pendingMode = 'solo';
+    newScoreVal.textContent = fs;
+    scoreNameInput.value = '';
+    setTimeout(()=>{
+      nameScreen.classList.remove('hide'); nameScreen.classList.add('show');
+      scoreNameInput.focus();
+    }, 600);
+  } else if(gameMode === 'dual_last' && isLeaderboardWorthy('dual_last', fs)){
+    pendingScore = fs; pendingMode = 'dual_last';
+    newScoreVal.textContent = fs;
+    scoreNameInput.value = '';
+    setTimeout(()=>{
+      nameScreen.classList.remove('hide'); nameScreen.classList.add('show');
+      scoreNameInput.focus();
+    }, 600);
+  } else if(gameMode === 'dual_linked' && isLeaderboardWorthy('dual_linked', fs)){
+    pendingScore = fs; pendingMode = 'dual_linked';
     newScoreVal.textContent = fs;
     scoreNameInput.value = '';
     setTimeout(()=>{
@@ -1233,6 +1272,7 @@ function updateBall(b, kl, kr, dt){
 
   if(onPlat){
     let groundY = 0;
+    // Slants
     if(onPlat.slantDir && onPlat.tiltHeight){
       const hw = onPlat.width/2;
       const frac = (b.px + hw) / onPlat.width;
@@ -1241,14 +1281,6 @@ function updateBall(b, kl, kr, dt){
     if(b.py <= groundY){
       b.vy = 0; b.py = groundY;
       if(onPlat.slantDir){ b.vx -= onPlat.slantDir * 38 * dt; b.vx *= 1.02; }
-      if(onPlat.hasEndRamp || onPlat.isSpeedtunnel){
-        const exitZ = onPlat.z - onPlat.length/2;
-        const distToExit = -dist - exitZ;
-        if(distToExit >= 0 && distToExit < 3.5){
-          b.vy = speed * 0.18 * (1 - distToExit / 3.5);
-          b.py += 0.05;
-        }
-      }
     }
   }
 
@@ -1415,6 +1447,26 @@ function loop(ts){
       }
     }
 
+    // Slow-down orb collision
+    for(const orb of slowOrbs){
+      if(orb.collected) continue;
+      const wp = new THREE.Vector3();
+      orb.mesh.getWorldPosition(wp);
+      // Check against all alive balls
+      const balls = [b1];
+      if((gameMode==='dual_last'||gameMode==='dual_linked') && b2.alive) balls.push(b2);
+      for(const b of balls){
+        if(!b.alive) continue;
+        const dx=b.mesh.position.x-wp.x, dy=b.mesh.position.y-wp.y, dz=b.mesh.position.z-wp.z;
+        if(Math.sqrt(dx*dx+dy*dy+dz*dz) < orb.radius + CFG.ballR){
+          orb.collected = true;
+          orb.mesh.visible = false;
+          // Reduce speed by ~200 points worth
+          speed = Math.max(CFG.baseSpd, speed - 5);
+        }
+      }
+    }
+
     score = dist * 0.5;
     sEl.textContent = Math.floor(score);
     secEl.textContent = 'SECTION ' + sectionNum;
@@ -1452,6 +1504,7 @@ function loop(ts){
         });
         if(opacity <= 0){
           activeObs = activeObs.filter(o => o.parent !== p);
+          slowOrbs = slowOrbs.filter(o => o.parent !== p);
           scene.remove(p); platforms.splice(i,1);
         }
       }
