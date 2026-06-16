@@ -65,6 +65,8 @@
 </div>
 <div class="screen" id="ss">
   <h1>INCLINE</h1>
+  <div class="mode-label" style="margin-top:0">ENTER YOUR NAME FOR THE LEADERBOARDS</div>
+  <input id="player-name-input" maxlength="20" placeholder="YOUR NAME" autocomplete="off" spellcheck="false" style="font-family:'Press Start 2P',monospace;font-size:14px;letter-spacing:2px;background:transparent;border:none;border-bottom:2px solid #0f0;color:#0f0;text-align:center;width:220px;outline:none;text-transform:uppercase;margin-bottom:20px">
   <button class="btn" id="play-solo">SOLO</button>
   <div class="mode-label">LOCAL DUAL MODE</div>
   <div class="btn-row">
@@ -85,25 +87,12 @@
   </div>
   <div id="hi"></div>
   <div class="mode-label" style="margin-top:20px">LEADERBOARD — SOLO</div>
-  <div id="leaderboard-solo" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;margin-bottom:8px;width:100%;max-width:340px;text-align:center"></div>
+  <div id="leaderboard-solo" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;max-height:200px;overflow-y:auto;margin-bottom:8px;width:100%;max-width:340px"></div>
   <div class="mode-label">LEADERBOARD — LAST STAND</div>
-  <div id="leaderboard-dual_last" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;margin-bottom:8px;width:100%;max-width:340px;text-align:center"></div>
+  <div id="leaderboard-dual_last" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;max-height:200px;overflow-y:auto;margin-bottom:8px;width:100%;max-width:340px"></div>
   <div class="mode-label">LEADERBOARD — LINKED</div>
-  <div id="leaderboard-dual_linked" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;margin-bottom:8px;width:100%;max-width:340px;text-align:center"></div>
-  <button class="btn btn-small" id="admin-toggle" style="border-color:rgba(0,255,0,0.15);color:rgba(0,255,0,0.15);font-size:7px;padding:4px 12px">ADMIN</button>
-  <div id="admin-panel" style="display:none;margin-top:8px;text-align:center">
-    <input id="admin-pw" type="password" placeholder="PASSWORD" style="font-family:'Press Start 2P',monospace;font-size:8px;background:transparent;border:1px solid rgba(255,0,0,0.3);color:#f22;text-align:center;width:140px;padding:4px;outline:none">
-    <div id="admin-list" style="margin-top:8px;font-size:8px"></div>
-  </div>
+  <div id="leaderboard-dual_linked" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;max-height:200px;overflow-y:auto;margin-bottom:8px;width:100%;max-width:340px"></div>
   <div id="hint">STEER: A/D OR ←→ &nbsp; JUMP: SPACE/W/↑ &nbsp; MOBILE: TAP SIDES + SWIPE UP</div>
-</div>
-<!-- Score name entry popup -->
-<div class="screen hide" id="name-screen" style="background:rgba(0,0,0,0.92);justify-content:center">
-  <h2 style="color:#0f0;font-size:20px;margin-bottom:8px">NEW HIGH SCORE!</h2>
-  <div id="new-score-val" style="font-size:36px;color:#0f0;font-family:'Press Start 2P',monospace;margin-bottom:20px">0</div>
-  <div class="mode-label">ENTER YOUR NAME</div>
-  <input id="score-name-input" maxlength="20" placeholder="YOUR NAME" autocomplete="off" spellcheck="false" style="font-family:'Press Start 2P',monospace;font-size:16px;letter-spacing:3px;background:transparent;border:none;border-bottom:2px solid #0f0;color:#0f0;text-align:center;width:260px;outline:none;text-transform:uppercase">
-  <button class="btn" id="submit-score-btn" style="margin-top:20px">SUBMIT</button>
 </div>
 <div class="screen hide" id="mp-screen">
   <h1 style="font-size:36px;margin-bottom:8px">INCLINE</h1>
@@ -150,6 +139,7 @@
   <div id="fs">0</div>
   <div id="fl">SCORE</div>
   <div id="nb">★ NEW BEST ★</div>
+  <div id="lb-saved" style="font-size:9px;color:#ffdd00;letter-spacing:2px;margin-bottom:16px;display:none">✓ ADDED TO LEADERBOARD</div>
   <button class="btn" id="re-btn">RETRY</button>
   <button class="btn" id="menu-btn" style="margin-top:8px;font-size:10px;padding:8px 24px;border-color:rgba(0,255,0,0.4);color:rgba(0,255,0,0.4)">MENU</button>
 </div>
@@ -290,22 +280,19 @@ function updateHiDisplay(){
 updateHiDisplay();
 
 // =========== LEADERBOARD ===========
-const ADMIN_PW = 'cintowin';
 const MAX_LEADERBOARD = 50;
 const FB_URL = 'https://inclineleaderboard-default-rtdb.asia-southeast1.firebasedatabase.app';
 const LB_MODES = ['solo','dual_last','dual_linked'];
 let leaderboards = {solo:[], dual_last:[], dual_linked:[]};
-let pendingScore = 0;
-let pendingMode = 'solo';
-
-const adminToggle = document.getElementById('admin-toggle');
-const adminPanel = document.getElementById('admin-panel');
-const adminPw = document.getElementById('admin-pw');
-const adminList = document.getElementById('admin-list');
-const nameScreen = document.getElementById('name-screen');
-const newScoreVal = document.getElementById('new-score-val');
-const scoreNameInput = document.getElementById('score-name-input');
-const submitScoreBtn = document.getElementById('submit-score-btn');
+const playerNameInput = document.getElementById('player-name-input');
+try{ playerNameInput.value = localStorage.getItem('incline_player_name') || ''; }catch(e){}
+playerNameInput.addEventListener('input', ()=>{
+  try{ localStorage.setItem('incline_player_name', playerNameInput.value.trim().toUpperCase()); }catch(e){}
+});
+function getPlayerName(){
+  return (playerNameInput.value||'').trim().toUpperCase().slice(0,20) || 'ANON';
+}
+const lbSavedEl = document.getElementById('lb-saved');
 
 async function loadLeaderboard(mode){
   try{
@@ -349,13 +336,6 @@ async function saveScore(mode, name, sc){
     }
   }catch(e){ console.error('Save failed',e); }
 }
-async function deleteScore(mode, fbKey){
-  try{
-    await fetch(FB_URL+'/lb_'+mode+'/'+fbKey+'.json',{method:'DELETE'});
-    await loadLeaderboard(mode);
-    renderAdminList();
-  }catch(e){}
-}
 function isLeaderboardWorthy(mode, sc){
   const lb = leaderboards[mode];
   if(lb.length < MAX_LEADERBOARD) return sc > 0;
@@ -367,47 +347,18 @@ function renderLeaderboard(mode){
   const el = document.getElementById('leaderboard-'+mode);
   if(!el) return;
   const lb = leaderboards[mode];
-  if(lb.length===0){ el.innerHTML='<div style="color:rgba(0,255,0,0.2)">NO SCORES YET</div>'; return; }
+  if(lb.length===0){ el.innerHTML='<div style="color:rgba(0,255,0,0.2);text-align:center">NO SCORES YET</div>'; return; }
   el.innerHTML = lb.slice(0,MAX_LEADERBOARD).map((e,i)=>{
-    const medal = i===0?'&#x1F451; ':i===1?'&#x1F948; ':i===2?'&#x1F949; ':'';
+    const medal = i===0?'&#x1F451;':i===1?'&#x1F948;':i===2?'&#x1F949;':'';
     const col = i===0?'#ffdd00':i===1?'#aaaacc':i===2?'#cc8844':'rgba(0,255,0,0.5)';
-    return '<div style="color:'+col+';margin:3px 0">'+medal+(i+1)+'. '+e.name+' &mdash; '+e.score+'</div>';
+    return '<div style="display:flex;align-items:baseline;gap:6px;color:'+col+';line-height:1.7;padding:2px 4px">'
+      + '<span style="flex-shrink:0;width:14px;text-align:right">'+medal+'</span>'
+      + '<span style="flex-shrink:0">'+(i+1)+'.</span>'
+      + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left">'+e.name+'</span>'
+      + '<span style="flex-shrink:0">'+e.score+'</span>'
+      + '</div>';
   }).join('');
 }
-function renderAdminList(){
-  if(adminPw.value !== ADMIN_PW){ adminList.innerHTML='<div style="color:rgba(255,0,0,0.3)">WRONG PASSWORD</div>'; return; }
-  let html='';
-  for(const mode of LB_MODES){
-    const label = mode==='solo'?'SOLO':mode==='dual_last'?'LAST STAND':'LINKED';
-    html+='<div style="color:rgba(255,0,0,0.4);margin:8px 0 4px;font-size:7px">--- '+label+' ---</div>';
-    html+=leaderboards[mode].map((e,i)=>
-      '<div style="color:rgba(255,0,0,0.5);margin:2px 0;cursor:pointer" data-mode="'+mode+'" data-key="'+e.fbKey+'">&#x2715; '+(i+1)+'. '+e.name+' &mdash; '+e.score+'</div>'
-    ).join('');
-  }
-  adminList.innerHTML=html;
-  adminList.querySelectorAll('[data-key]').forEach(el=>{
-    el.addEventListener('click',()=>{ deleteScore(el.dataset.mode, el.dataset.key); });
-  });
-}
-
-adminToggle.addEventListener('click',()=>{
-  adminPanel.style.display = adminPanel.style.display==='none'?'block':'none';
-});
-adminPw.addEventListener('input', renderAdminList);
-
-submitScoreBtn.addEventListener('click', async ()=>{
-  const name = scoreNameInput.value.trim().toUpperCase() || 'ANON';
-  submitScoreBtn.textContent='SAVING...';
-  submitScoreBtn.disabled=true;
-  await saveScore(pendingMode, name, pendingScore);
-  submitScoreBtn.textContent='SUBMIT';
-  submitScoreBtn.disabled=false;
-  nameScreen.classList.remove('show'); nameScreen.classList.add('hide');
-  osEl.classList.remove('hide'); osEl.classList.add('show');
-});
-scoreNameInput.addEventListener('keydown',e=>{
-  if(e.key==='Enter') submitScoreBtn.click();
-});
 
 loadAllLeaderboards();
 
@@ -1156,6 +1107,7 @@ function gameOver(){
   const fs = Math.floor(score);
   fsEl.textContent = fs;
   nbEl.style.display = 'none';
+  lbSavedEl.style.display = 'none';
   const modeKey = gameMode === 'solo' ? 'solo' : gameMode === 'dual_last' ? 'dual_last' : 'dual_linked';
   if(fs > (hiScores[modeKey]||0)){
     hiScores[modeKey] = fs;
@@ -1163,33 +1115,10 @@ function gameOver(){
     nbEl.style.display = 'block';
     updateHiDisplay();
   }
-  if(gameMode === 'solo' && isLeaderboardWorthy('solo', fs)){
-    pendingScore = fs; pendingMode = 'solo';
-    newScoreVal.textContent = fs;
-    scoreNameInput.value = '';
-    setTimeout(()=>{
-      nameScreen.classList.remove('hide'); nameScreen.classList.add('show');
-      scoreNameInput.focus();
-    }, 600);
-  } else if(gameMode === 'dual_last' && isLeaderboardWorthy('dual_last', fs)){
-    pendingScore = fs; pendingMode = 'dual_last';
-    newScoreVal.textContent = fs;
-    scoreNameInput.value = '';
-    setTimeout(()=>{
-      nameScreen.classList.remove('hide'); nameScreen.classList.add('show');
-      scoreNameInput.focus();
-    }, 600);
-  } else if(gameMode === 'dual_linked' && isLeaderboardWorthy('dual_linked', fs)){
-    pendingScore = fs; pendingMode = 'dual_linked';
-    newScoreVal.textContent = fs;
-    scoreNameInput.value = '';
-    setTimeout(()=>{
-      nameScreen.classList.remove('hide'); nameScreen.classList.add('show');
-      scoreNameInput.focus();
-    }, 600);
-  } else {
-    setTimeout(()=>{ osEl.classList.remove('hide'); osEl.classList.add('show'); }, 600);
+  if(isLeaderboardWorthy(modeKey, fs)){
+    saveScore(modeKey, getPlayerName(), fs).then(()=>{ lbSavedEl.style.display = 'block'; });
   }
+  setTimeout(()=>{ osEl.classList.remove('hide'); osEl.classList.add('show'); }, 600);
 }
 
 function isOnPlatformAt(bx, bz){
@@ -1610,12 +1539,10 @@ document.getElementById('play-last').addEventListener('click',()=>startGame('dua
 document.getElementById('play-linked').addEventListener('click',()=>startGame('dual_linked'));
 document.getElementById('re-btn').addEventListener('click',()=>{
   osEl.classList.remove('show'); osEl.classList.add('hide');
-  nameScreen.classList.remove('show'); nameScreen.classList.add('hide');
   reset();
 });
 document.getElementById('menu-btn').addEventListener('click',()=>{
   osEl.classList.remove('show'); osEl.classList.add('hide');
-  nameScreen.classList.remove('show'); nameScreen.classList.add('hide');
   if(mpMode) cleanupMp();
   running=false; dead=false;
   ssEl.style.display='flex'; ssEl.classList.remove('hidden');
