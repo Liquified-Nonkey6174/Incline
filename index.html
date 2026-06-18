@@ -336,7 +336,7 @@ updateHiDisplay();
 
 // =========== LEADERBOARD ===========
 const MAX_LEADERBOARD = 50;
-const FB_URL = 'https://incline.chester-q-peng.workers.dev';
+const FB_URL = 'https://inclineleaderboard-default-rtdb.asia-southeast1.firebasedatabase.app';
 const LB_MODES = ['solo','dual_last','dual_linked'];
 let leaderboards = {solo:[], dual_last:[], dual_linked:[]};
 const playerNameInput = document.getElementById('player-name-input');
@@ -1614,7 +1614,7 @@ document.getElementById('menu-btn').addEventListener('click',()=>{
 
 
 // =========== MULTIPLAYER ===========
-const ABLY_KEY = 'HmF23g.MrTOiw:GuDW3k1KqpeFoQcNTDC7q_UL3tdIZac8TKVtAQ9Qfkc';
+const ABLY_KEY = 'HmF23g.2ief3w:6QAYCui0eFUYLjGVENZ_nfbjIey-V1alMIdBZ8e0lv4';
 let ablyClient=null, ablyChannel=null;
 let mpMode=false, isHost=false, mpRoomCode='';
 let myPlayerId=null, myName='', myPlayerIndex=0;
