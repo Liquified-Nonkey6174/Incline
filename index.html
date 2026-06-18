@@ -336,7 +336,7 @@ updateHiDisplay();
 
 // =========== LEADERBOARD ===========
 const MAX_LEADERBOARD = 50;
-const FB_URL = "https://inclineleaderboard-default-rtdb.asia-southeast1.firebasedatabase.app";;
+const FB_URL = 'https://incline.chester-q-peng.workers.dev';
 const LB_MODES = ['solo','dual_last','dual_linked'];
 let leaderboards = {solo:[], dual_last:[], dual_linked:[]};
 const playerNameInput = document.getElementById('player-name-input');
@@ -366,31 +366,30 @@ async function loadAllLeaderboards(){
 async function saveScore(mode, name, sc){
   try{
     const cleanName = name.toUpperCase().slice(0,20);
-
-    const entry = {
-      name: cleanName,
-      score: Number(sc),
-      time: Date.now()
-    };
-
-    const res = await fetch(FB_URL+'/lb_'+mode+'.json',{
+    await loadLeaderboard(mode);
+    // Check if this person already has a score
+    const existing = leaderboards[mode].find(e => e.name === cleanName);
+    if(existing){
+      if(sc <= existing.score) return; // not a PB, skip
+      // Delete old score, we'll add the new one
+      if(existing.fbKey) await fetch(FB_URL+'/lb_'+mode+'/'+existing.fbKey+'.json',{method:'DELETE'});
+    }
+    const entry = {name:cleanName, score:sc, time:Date.now()};
+    await fetch(FB_URL+'/lb_'+mode+'.json',{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json'
-      },
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify(entry)
     });
-
-    if(!res.ok){
-      console.error("Score submit failed:", res.status, await res.text());
-      return;
-    }
-
     await loadLeaderboard(mode);
-
-  }catch(e){
-    console.error('Save failed',e);
-  }
+    // Trim to top scores
+    if(leaderboards[mode].length > MAX_LEADERBOARD){
+      const toRemove = leaderboards[mode].slice(MAX_LEADERBOARD);
+      for(const e of toRemove){
+        if(e.fbKey) await fetch(FB_URL+'/lb_'+mode+'/'+e.fbKey+'.json',{method:'DELETE'});
+      }
+      await loadLeaderboard(mode);
+    }
+  }catch(e){ console.error('Save failed',e); }
 }
 function isLeaderboardWorthy(mode, sc){
   const lb = leaderboards[mode];
