@@ -44,6 +44,9 @@
   #player-list { font-size: 9px; margin: 8px 0 16px; min-height: 40px; }
   #player-list div { margin: 4px 0; letter-spacing: 2px; }
   .btn-small { font-size: 10px; padding: 8px 20px; }
+  .lb-section::-webkit-scrollbar { width: 4px; }
+  .lb-section::-webkit-scrollbar-track { background: rgba(0,255,0,0.05); }
+  .lb-section::-webkit-scrollbar-thumb { background: rgba(0,255,0,0.3); border-radius: 2px; }
 </style>
 </head>
 <body>
@@ -68,12 +71,13 @@
   <div class="mode-label" style="margin-top:0">ENTER YOUR NAME FOR THE LEADERBOARDS</div>
   <input id="player-name-input" maxlength="20" placeholder="YOUR NAME" autocomplete="off" spellcheck="false" style="font-family:'Press Start 2P',monospace;font-size:14px;letter-spacing:2px;background:transparent;border:none;border-bottom:2px solid #0f0;color:#0f0;text-align:center;width:220px;outline:none;text-transform:uppercase;margin-bottom:20px">
   <button class="btn" id="play-solo">SOLO</button>
-  <div class="mode-label">LOCAL DUAL MODE</div>
+  <div class="mode-label">LOCAL MULTIPLAYER</div>
   <div class="btn-row">
     <button class="btn btn-yellow" id="play-last">LAST STAND</button>
     <button class="btn btn-yellow" id="play-linked">LINKED</button>
+    <button class="btn" id="play-versus" style="border-color:#ff6644;color:#ff6644">VERSUS</button>
   </div>
-  <div class="mode-label">ONLINE</div>
+  <div class="mode-label">ONLINE MULTIPLAYER</div>
   <button class="btn" style="border-color:#4488ff;color:#4488ff" id="play-online">MULTIPLAYER</button>
   <div class="mode-label" style="margin-top:20px">CHARACTER</div>
   <div id="char-desc" style="font-size:7px;color:rgba(0,255,0,0.3);letter-spacing:1px;margin-bottom:8px;text-align:center;min-height:14px">STANDARD</div>
@@ -87,11 +91,11 @@
   </div>
   <div id="hi"></div>
   <div class="mode-label" style="margin-top:20px">LEADERBOARD — SOLO</div>
-  <div id="leaderboard-solo" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;max-height:200px;overflow-y:auto;margin-bottom:8px;width:100%;max-width:340px"></div>
+  <div id="leaderboard-solo" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;max-height:300px;overflow-y:auto;margin-bottom:8px;width:100%;max-width:340px"></div>
   <div class="mode-label">LEADERBOARD — LAST STAND</div>
-  <div id="leaderboard-dual_last" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;max-height:200px;overflow-y:auto;margin-bottom:8px;width:100%;max-width:340px"></div>
+  <div id="leaderboard-dual_last" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;max-height:300px;overflow-y:auto;margin-bottom:8px;width:100%;max-width:340px"></div>
   <div class="mode-label">LEADERBOARD — LINKED</div>
-  <div id="leaderboard-dual_linked" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;max-height:200px;overflow-y:auto;margin-bottom:8px;width:100%;max-width:340px"></div>
+  <div id="leaderboard-dual_linked" class="lb-section" style="font-size:9px;letter-spacing:1px;min-height:30px;max-height:300px;overflow-y:auto;margin-bottom:8px;width:100%;max-width:340px"></div>
   <div id="hint">STEER: A/D OR ←→ &nbsp; JUMP: SPACE/W/↑ &nbsp; MOBILE: TAP SIDES + SWIPE UP</div>
 </div>
 <div class="screen hide" id="mp-screen">
@@ -133,6 +137,57 @@
   <div id="round-tally" style="font-size:9px;color:rgba(0,255,0,0.4);letter-spacing:2px;margin-bottom:24px"></div>
   <button class="btn" id="next-round-btn" style="display:none">NEXT ROUND</button>
   <div id="round-wait" style="font-size:9px;color:rgba(0,255,0,0.3);letter-spacing:2px;display:none">WAITING FOR HOST...</div>
+</div>
+<!-- Versus setup screen -->
+<div class="screen hide" id="vs-setup" style="justify-content:center">
+  <h2 style="color:#ff6644;font-size:24px;margin-bottom:24px">VERSUS MODE</h2>
+  <div style="display:flex;gap:40px;flex-wrap:wrap;justify-content:center;margin-bottom:20px">
+    <div style="text-align:center">
+      <div style="color:#ffdd00;font-size:10px;letter-spacing:2px;margin-bottom:8px">PLAYER 1 (WASD)</div>
+      <input id="vs-name1" maxlength="20" placeholder="NAME" autocomplete="off" spellcheck="false" style="font-family:'Press Start 2P',monospace;font-size:14px;background:transparent;border:none;border-bottom:2px solid #ffdd00;color:#ffdd00;text-align:center;width:160px;outline:none;text-transform:uppercase">
+    </div>
+    <div style="text-align:center">
+      <div style="color:#4488ff;font-size:10px;letter-spacing:2px;margin-bottom:8px">PLAYER 2 (ARROWS)</div>
+      <input id="vs-name2" maxlength="20" placeholder="NAME" autocomplete="off" spellcheck="false" style="font-family:'Press Start 2P',monospace;font-size:14px;background:transparent;border:none;border-bottom:2px solid #4488ff;color:#4488ff;text-align:center;width:160px;outline:none;text-transform:uppercase">
+    </div>
+  </div>
+  <div id="vs-wins" style="font-size:10px;color:rgba(0,255,0,0.5);letter-spacing:2px;margin-bottom:16px"></div>
+  <div class="btn-row">
+    <button class="btn" id="vs-start" style="border-color:#ff6644;color:#ff6644">START</button>
+    <button class="btn btn-small" id="vs-reset-wins" style="border-color:rgba(0,255,0,0.2);color:rgba(0,255,0,0.2)">RESET WINS</button>
+  </div>
+  <button class="btn btn-small" id="vs-back" style="margin-top:12px;border-color:rgba(0,255,0,0.3);color:rgba(0,255,0,0.3)">BACK</button>
+</div>
+<!-- Versus split screen -->
+<div id="vs-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:#000">
+  <div style="position:absolute;top:0;left:50%;width:2px;height:100%;background:rgba(255,255,255,0.15);z-index:10;transform:translateX(-1px)"></div>
+  <div id="vs-hud" style="position:absolute;top:0;left:0;right:0;z-index:10;display:flex;justify-content:space-between;padding:12px 20px;pointer-events:none">
+    <div style="text-align:left">
+      <div id="vs-score1" style="font-family:'Press Start 2P',monospace;font-size:18px;color:#ffdd00;text-shadow:0 0 8px rgba(255,221,0,0.5)">0</div>
+      <div id="vs-label1" style="font-size:7px;color:rgba(255,221,0,0.5);letter-spacing:2px;margin-top:2px">P1</div>
+      <div id="vs-jumps1" style="font-size:9px;color:#ffdd00;margin-top:4px">J:1</div>
+    </div>
+    <div style="text-align:center">
+      <div id="vs-status" style="font-family:'Press Start 2P',monospace;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:2px"></div>
+    </div>
+    <div style="text-align:right">
+      <div id="vs-score2" style="font-family:'Press Start 2P',monospace;font-size:18px;color:#4488ff;text-shadow:0 0 8px rgba(68,136,255,0.5)">0</div>
+      <div id="vs-label2" style="font-size:7px;color:rgba(68,136,255,0.5);letter-spacing:2px;margin-top:2px">P2</div>
+      <div id="vs-jumps2" style="font-size:9px;color:#4488ff;margin-top:4px">J:1</div>
+    </div>
+  </div>
+  <canvas id="vs-canvas1" style="position:absolute;top:0;left:0;width:50%;height:100%"></canvas>
+  <canvas id="vs-canvas2" style="position:absolute;top:0;left:50%;width:50%;height:100%"></canvas>
+</div>
+<!-- Versus round result -->
+<div class="screen hide" id="vs-result" style="justify-content:center;z-index:300">
+  <h2 id="vs-winner" style="font-size:28px;margin-bottom:16px">WINNER!</h2>
+  <div id="vs-result-scores" style="font-size:11px;letter-spacing:2px;margin-bottom:12px"></div>
+  <div id="vs-result-tally" style="font-size:10px;color:rgba(0,255,0,0.5);letter-spacing:2px;margin-bottom:24px"></div>
+  <div class="btn-row">
+    <button class="btn" id="vs-again" style="border-color:#ff6644;color:#ff6644">AGAIN</button>
+    <button class="btn btn-small" id="vs-quit" style="border-color:rgba(0,255,0,0.3);color:rgba(0,255,0,0.3)">MENU</button>
+  </div>
 </div>
 <div class="screen hide" id="os">
   <h2>GAME OVER</h2>
@@ -1813,7 +1868,7 @@ mpStartBtn.addEventListener('click',()=>{
 });
 
 const goBackToMenu=()=>{
-  mpScreen.classList.remove('show');mpScreen.classList.add('hide');
+  mpScreen.classList.remove('show');mpScreen.classList.add('hide');mpScreen.style.display='';
   roundScreen.classList.remove('show');roundScreen.classList.add('hide');
   ssEl.style.display='flex'; ssEl.classList.remove('hidden');
   cleanupMp();
@@ -1838,6 +1893,210 @@ b1.mesh.position.set(0,0,0);
     requestAnimationFrame(idle);
   }
 })();
+
+
+// =========== VERSUS MODE ===========
+let vsActive=false,vsInst=[],vsSeed=0,vsWins=[0,0],vsNames=['P1','P2'];
+const vsOverlay=document.getElementById('vs-overlay');
+const vsSetup=document.getElementById('vs-setup');
+const vsResult=document.getElementById('vs-result');
+try{vsWins=JSON.parse(localStorage.getItem('vs_wins')||'[0,0]');}catch(e){}
+function updWins(){const e=document.getElementById('vs-wins');if(e)e.textContent=vsNames[0]+': '+vsWins[0]+' — '+vsNames[1]+': '+vsWins[1];}
+
+function mkVsInst(cid,col,seed){
+  const cv=document.getElementById(cid);
+  const w0=cv.clientWidth||400,h0=cv.clientHeight||600;
+  // Own scene, camera, renderer
+  const myScene=new THREE.Scene();myScene.background=new THREE.Color(0);myScene.fog=new THREE.FogExp2(0,0.014);
+  const myCam=new THREE.PerspectiveCamera(72,w0/h0,0.1,300);
+  const myRen=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+  myRen.setSize(w0,h0);myRen.setPixelRatio(Math.min(devicePixelRatio,2));
+  // Ball
+  const myBall=makeBallMesh(col,'ball');myBall.userData.shape='ball';myScene.add(myBall);
+  // BG buildings - save/restore seed so both instances get same game seed
+  const bgSeed=_seed;
+  for(let s=-1;s<=1;s+=2)for(let i=0;i<20;i++){
+    const bw=2+Math.random()*4,bh=4+Math.random()*16,bd=2+Math.random()*4;
+    const b=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd,2,Math.floor(bh/2),2),
+      new THREE.MeshBasicMaterial({color:0x00ff00,wireframe:true,transparent:true,opacity:0.08}));
+    b.position.set(s*(CFG.tw/2+8+Math.random()*18),bh/2-2,-i*16-Math.random()*10);myScene.add(b);
+  }
+  // Instance state
+  let myPlats=[],myObs=[],myOrbs=[],myMovObs=[];
+  let myGenZ=0,mySectionNum=0,mySpeedtunnelCount=0;
+  let mySpd=CFG.baseSpd,myDist=0,myVx=0,myVy=0,myPx=0,myPy=0;
+  let myAlive=true,myScore=0,myJmps=1,myJq=0,myLastM=0;
+
+  // Context swap: temporarily replace globals, call generation, restore
+  function withCtx(fn){
+    const _sc=scene,_pl=platforms,_ob=activeObs,_so=slowOrbs,_gz=genZ,_sn=sectionNum,_st=speedtunnelCount,_s=score;
+    scene=myScene;platforms=myPlats;activeObs=myObs;slowOrbs=myOrbs;genZ=myGenZ;sectionNum=mySectionNum;speedtunnelCount=mySpeedtunnelCount;score=myScore;
+    fn();
+    myPlats=platforms;myObs=activeObs;myOrbs=slowOrbs;myGenZ=genZ;mySectionNum=sectionNum;mySpeedtunnelCount=speedtunnelCount;
+    scene=_sc;platforms=_pl;activeObs=_ob;slowOrbs=_so;genZ=_gz;sectionNum=_sn;speedtunnelCount=_st;score=_s;
+  }
+
+  function reset(){
+    myPlats.forEach(p=>myScene.remove(p));
+    myPlats=[];myObs=[];myOrbs=[];myMovObs=[];
+    mySpd=CFG.baseSpd;myDist=0;myGenZ=0;mySectionNum=0;mySpeedtunnelCount=0;
+    myVx=0;myVy=0;myPx=0;myPy=0;myAlive=true;myScore=0;myJmps=1;myJq=0;myLastM=0;
+    setSeed(seed);
+    withCtx(()=>{
+      makePlatform(-10,30,CFG.tw);
+      genZ=-25;
+      for(let i=0;i<3;i++)generateSection();
+    });
+    myBall.position.set(0,0,0);myBall.visible=true;
+  }
+
+  function isOnPlat(){
+    for(const p of myPlats){
+      const d=p.userData,pz=p.position.z,px2=p.position.x||0;
+      if(-myDist>pz-d.length/2&&-myDist<pz+d.length/2){
+        if(d.isSnake){const f=1-(-myDist-(pz-d.length/2))/d.length;const pathX=Math.sin(f*Math.PI*2.5)*d.snakeAmplitude;
+          if(Math.abs(myPx-pathX)<d.snakeHW+0.2)return d;}
+        else if(Math.abs(myPx-px2)<d.width/2+0.1)return d;
+      }
+    }return null;
+  }
+
+  function upd(dt,kl,kr){
+    if(!myAlive)return;
+    myVx+=((kr?1:0)-(kl?1:0))*CFG.steer*dt;myVx*=CFG.damp;myPx+=myVx*dt;
+    mySpd+=(CFG.spdUp+mySpd*0.003)*0.6*dt;myDist+=mySpd*dt;
+    // Boost
+    for(const p of myPlats)if(p.userData.isSpeedtunnel){const pz=p.position.z;const hl=p.userData.tunnelHL||10;
+      if(-myDist>pz-hl&&-myDist<pz+hl)mySpd+=4*dt;}
+    myVy-=CFG.gravity*dt;myPy+=myVy*dt;
+    const onP=isOnPlat();
+    if(onP){
+      let gY=0;
+      if(onP.slantDir&&onP.tiltHeight){const hw=onP.width/2;const f=(myPx+hw)/onP.width;
+        gY=onP.slantDir>0?onP.tiltHeight*f:onP.tiltHeight*(1-f);}
+      if(myPy<=gY){myVy=0;myPy=gY;if(onP.slantDir){myVx-=onP.slantDir*38*dt;myVx*=1.02;}}
+    }
+    if(myJq>0&&myJmps>0){myVy=Math.sqrt(2*CFG.gravity*2.4);myJmps--;myJq--;}
+    if(myPy<-12){myAlive=false;myBall.visible=false;return;}
+    myBall.position.set(myPx,myPy,-myDist);myBall.rotation.x-=mySpd*dt/(CFG.ballR*3);
+    // Moving obs
+    const now=performance.now()/1000;
+    for(const o of myObs){
+      if(!o.moving)continue;const el=now-o.born;
+      if(o.type==='hor'){const he=el-(o.delay||0);if(he<0)continue;const rng=o.maxX-o.minX;const cyc=rng/o.spd*2;
+        const t=(he%cyc)/cyc;o.mesh.position.x=t<0.5?o.minX+(t*2)*rng:o.maxX-((t-0.5)*2)*rng;}
+      if(o.type==='vert'){const ph=((el+(o.phaseOffset||0))%o.period)/o.period;
+        o.mesh.position.y=ph<0.5?o.baseY+(ph*2)*o.amplitude:o.baseY+(1-(ph-0.5)*2)*o.amplitude;}
+    }
+    // Collision
+    for(const o of myObs){const wp=new THREE.Vector3();o.mesh.getWorldPosition(wp);
+      if(Math.abs(myPx-wp.x)<o.hw&&Math.abs(myPy-wp.y)<o.hh&&Math.abs(-myDist-wp.z)<o.hd){myAlive=false;myBall.visible=false;return;}}
+    // Slow orbs
+    for(const o of myOrbs){if(o.collected)continue;const wp=new THREE.Vector3();o.mesh.getWorldPosition(wp);
+      const dx=myPx-wp.x,dy=myPy-wp.y,dz=-myDist-wp.z;
+      if(Math.sqrt(dx*dx+dy*dy+dz*dz)<o.radius+CFG.ballR){o.collected=true;o.mesh.visible=false;mySpd=Math.max(CFG.baseSpd,mySpd-5);}}
+    myScore=Math.floor(myDist*0.5);
+    const m=Math.floor(myScore/200);if(m>myLastM){myJmps+=(m-myLastM);myLastM=m;}
+    // Generate ahead
+    setSeed(seed+(myGenZ*7|0));// deterministic sub-seed for generation
+    withCtx(()=>{score=myScore;while(genZ>-myDist-250)generateSection();});
+    // Cleanup behind
+    for(let i=myPlats.length-1;i>=0;i--){const p=myPlats[i];
+      const ex=p.position.z-p.userData.length/2;if(-myDist-ex<-3){
+        myObs=myObs.filter(o=>o.parent!==p);myOrbs=myOrbs.filter(o=>o.parent!==p);
+        myScene.remove(p);myPlats.splice(i,1);}}
+  }
+  function render(){const cx=myPx*0.35,cy=myPy+3.8;
+    myCam.position.lerp(new THREE.Vector3(cx,cy,-myDist+7),myAlive?0.08:0.02);
+    myCam.lookAt(cx*1.4,cy-5.3,-myDist-14);myRen.render(myScene,myCam);}
+  function rsz(){const w2=cv.clientWidth,h2=cv.clientHeight;if(w2&&h2){myCam.aspect=w2/h2;myCam.updateProjectionMatrix();myRen.setSize(w2,h2);}}
+  return{reset,upd,render,rsz,qj(){myJq++;},get alive(){return myAlive;},get score(){return myScore;},get jumps(){return myJmps;}};
+}
+
+document.getElementById('play-versus').addEventListener('click',()=>{
+  ssEl.classList.add('hidden');ssEl.style.display='none';
+  vsSetup.classList.remove('hide');vsSetup.classList.add('show');
+  document.getElementById('vs-name1').value=vsNames[0]!=='P1'?vsNames[0]:'';
+  document.getElementById('vs-name2').value=vsNames[1]!=='P2'?vsNames[1]:'';
+  updWins();
+});
+document.getElementById('vs-back').addEventListener('click',()=>{
+  vsSetup.classList.remove('show');vsSetup.classList.add('hide');
+  ssEl.style.display='flex';ssEl.classList.remove('hidden');
+});
+document.getElementById('vs-reset-wins').addEventListener('click',()=>{
+  vsWins=[0,0];localStorage.setItem('vs_wins',JSON.stringify(vsWins));updWins();
+});
+
+function startVs(){
+  vsNames[0]=document.getElementById('vs-name1').value.trim().toUpperCase()||'P1';
+  vsNames[1]=document.getElementById('vs-name2').value.trim().toUpperCase()||'P2';
+  document.getElementById('vs-label1').textContent=vsNames[0];
+  document.getElementById('vs-label2').textContent=vsNames[1];
+  vsSetup.classList.remove('show');vsSetup.classList.add('hide');
+  vsResult.classList.remove('show');vsResult.classList.add('hide');
+  vsOverlay.style.display='block';vsActive=true;
+  vsSeed=Math.floor(Math.random()*2147483647);
+  const i1=mkVsInst('vs-canvas1',0xffdd00,vsSeed);
+  const i2=mkVsInst('vs-canvas2',0x4488ff,vsSeed);
+  i1.reset();i2.reset();
+  vsInst=[i1,i2];
+  let lt=performance.now();
+  const k={l1:false,r1:false,l2:false,r2:false};
+  function kh(e,d){
+    if(e.key==='a'||e.key==='A')k.l1=d;if(e.key==='d'||e.key==='D')k.r1=d;
+    if((e.key==='w'||e.key==='W'||e.key===' ')&&d)i1.qj();
+    if(e.key==='ArrowLeft'){e.preventDefault();k.l2=d;}if(e.key==='ArrowRight'){e.preventDefault();k.r2=d;}
+    if(e.key==='ArrowUp'&&d){e.preventDefault();i2.qj();}
+  }
+  const kd=e=>kh(e,true),ku=e=>kh(e,false);
+  document.addEventListener('keydown',kd);document.addEventListener('keyup',ku);
+  function lp(ts){
+    if(!vsActive){document.removeEventListener('keydown',kd);document.removeEventListener('keyup',ku);return;}
+    const dt=Math.min((ts-lt)/1000,0.05);lt=ts;
+    i1.upd(dt,k.l1,k.r1);i2.upd(dt,k.l2,k.r2);i1.render();i2.render();
+    document.getElementById('vs-score1').textContent=i1.score;
+    document.getElementById('vs-score2').textContent=i2.score;
+    document.getElementById('vs-jumps1').textContent='J:'+i1.jumps;
+    document.getElementById('vs-jumps2').textContent='J:'+i2.jumps;
+    const st=document.getElementById('vs-status');
+    if(!i1.alive&&!i2.alive){vsActive=false;document.removeEventListener('keydown',kd);document.removeEventListener('keyup',ku);endVs(i1.score,i2.score);return;}
+    if(!i1.alive&&i2.alive)st.textContent=vsNames[0]+' CRASHED';
+    else if(!i2.alive&&i1.alive)st.textContent=vsNames[1]+' CRASHED';
+    else st.textContent='';
+    requestAnimationFrame(lp);
+  }
+  requestAnimationFrame(lp);
+}
+
+function endVs(s1,s2){
+  const w=s1>s2?0:s2>s1?1:-1;if(w>=0)vsWins[w]++;
+  localStorage.setItem('vs_wins',JSON.stringify(vsWins));
+  const FB_U=FB_URL;
+  async function sub(nm,sc){try{
+    const r=await fetch(FB_U+'/lb_solo.json');const d=await r.json();
+    let lb=d?Object.entries(d).map(([k,v])=>({...v,fbKey:k})):[];lb.sort((a,b)=>b.score-a.score);
+    const ex=lb.find(e=>e.name===nm);if(ex&&sc<=ex.score)return;
+    if(ex)await fetch(FB_U+'/lb_solo/'+ex.fbKey+'.json',{method:'DELETE'});
+    if(lb.length<50||sc>lb[lb.length-1].score)await fetch(FB_U+'/lb_solo.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:nm,score:sc,time:Date.now()})});
+  }catch(e){}}
+  sub(vsNames[0],s1);sub(vsNames[1],s2);
+  vsOverlay.style.display='none';
+  const we=document.getElementById('vs-winner');
+  we.textContent=w>=0?vsNames[w]+' WINS!':'DRAW!';
+  we.style.color=w===0?'#ffdd00':w===1?'#4488ff':'#0f0';
+  document.getElementById('vs-result-scores').innerHTML='<span style="color:#ffdd00">'+vsNames[0]+': '+s1+'</span> — <span style="color:#4488ff">'+vsNames[1]+': '+s2+'</span>';
+  document.getElementById('vs-result-tally').textContent=vsNames[0]+' '+vsWins[0]+' — '+vsWins[1]+' '+vsNames[1];
+  vsResult.classList.remove('hide');vsResult.classList.add('show');
+}
+document.getElementById('vs-start').addEventListener('click',startVs);
+document.getElementById('vs-again').addEventListener('click',startVs);
+document.getElementById('vs-quit').addEventListener('click',()=>{
+  vsActive=false;vsOverlay.style.display='none';
+  vsResult.classList.remove('show');vsResult.classList.add('hide');
+  ssEl.style.display='flex';ssEl.classList.remove('hidden');
+});
+window.addEventListener('resize',()=>{vsInst.forEach(i=>i.rsz());});
 
 })();
 </script>
