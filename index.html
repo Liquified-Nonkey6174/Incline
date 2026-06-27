@@ -88,6 +88,8 @@
     <button class="btn btn-small char-btn" data-shape="cylinder" style="padding:8px 14px">CYLINDER</button>
     <button class="btn btn-small char-btn" data-shape="stickman" style="padding:8px 14px">STICKMAN</button>
     <button class="btn btn-small char-btn" data-shape="cat" style="padding:8px 14px">CAT</button>
+    <button class="btn btn-small char-btn" data-shape="turtle" style="padding:8px 14px">TURTLE</button>
+    <button class="btn btn-small char-btn" data-shape="anime" style="padding:8px 14px;border-color:#ff69b4;color:#ff69b4">ANIME GIRL</button>
   </div>
   <div id="hi"></div>
   <div class="mode-label" style="margin-top:20px">LEADERBOARD — SOLO</div>
@@ -255,7 +257,9 @@ const CHAR_DESCS={
   pyramid:'STANDARD',
   cylinder:'STANDARD',
   stickman:'THIN HITBOX · 0.7x SPEED · 0.6x JUMP HEIGHT',
-  cat:'THIN HITBOX · 1.5x SPEED · 2x JUMP HEIGHT'
+  cat:'THIN HITBOX · 1.5x SPEED · 2x JUMP HEIGHT',
+  turtle:'0.4x SPEED · 0.5x STEERING · NO JUMPS',
+  anime:'GO OUTSIDE.'
 };
 
 // Character selection
@@ -538,6 +542,62 @@ function makeBallMesh(color, shape){
     group.userData.shape='cat';
     group.userData.legs=catLegs;
     group.userData.tail=tail;
+    return group;
+  }
+  if(shape==='turtle'){
+    const group = new THREE.Group();
+    // Shell - dome on top (half sphere flattened)
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(R*1.0, 8, 6, 0, Math.PI*2, 0, Math.PI*0.55), mat.clone());
+    shell.position.y = R*0.3;
+    group.add(shell);
+    // Shell pattern lines
+    for(let a=0;a<Math.PI*2;a+=Math.PI/3){
+      const pts=[new THREE.Vector3(0,R*0.8,0),
+        new THREE.Vector3(Math.sin(a)*R*0.9,R*0.35,Math.cos(a)*R*0.9)];
+      group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({color:mat.color,transparent:true,opacity:0.3})));
+    }
+    // Body/belly
+    const belly = new THREE.Mesh(new THREE.CylinderGeometry(R*0.85, R*0.85, R*0.25, 8), mat.clone());
+    belly.position.y = R*0.2;
+    group.add(belly);
+    // Head - small sphere poking out front
+    const head = new THREE.Mesh(new THREE.SphereGeometry(R*0.3, 6, 5), mat.clone());
+    head.position.set(0, R*0.35, -R*1.0);
+    group.add(head);
+    // 4 stubby legs
+    const tLegs = [];
+    const tLegPos = [[R*0.55,0,-R*0.4],[-R*0.55,0,-R*0.4],[R*0.55,0,R*0.4],[-R*0.55,0,R*0.4]];
+    for(const lp of tLegPos){
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(R*0.12, R*0.12, R*0.35, 4), mat.clone());
+      leg.position.set(lp[0], lp[1], lp[2]);
+      group.add(leg);
+      tLegs.push(leg);
+    }
+    // Tiny tail
+    const tTail = new THREE.Mesh(new THREE.CylinderGeometry(R*0.04, R*0.02, R*0.3, 3), mat.clone());
+    tTail.position.set(0, R*0.2, R*1.0);
+    tTail.rotation.x = -0.5;
+    group.add(tTail);
+    // Glow
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(R*0.4, 6, 4), innerMat);
+    glow.position.y = R*0.4;
+    group.add(glow);
+    group.userData.shape='turtle';
+    group.userData.legs=tLegs;
+    return group;
+  }
+  if(shape==='anime'){
+    const group = new THREE.Group();
+    // Load PNG as a billboard sprite
+    const tex = new THREE.TextureLoader().load('anime.png');
+    tex.encoding = THREE.sRGBEncoding;
+    const spriteMat = new THREE.SpriteMaterial({map:tex, transparent:true});
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.scale.set(R*3, R*3, 1);
+    sprite.position.y = R*1.5;
+    group.add(sprite);
+    group.userData.shape='anime';
     return group;
   }
   // Default ball
@@ -1128,8 +1188,8 @@ function reset(){
   genZ=0; sectionNum=0; shake=0; dead=false;
   
   
-  jumpsRemaining=1; jumpsRemaining2=1; lastJumpMilestone=0;
-  jumpCountEl.textContent='1';
+  jumpsRemaining=selectedShape==='turtle'?0:1; jumpsRemaining2=1; lastJumpMilestone=0;
+  jumpCountEl.textContent=jumpsRemaining;
   jumpCountEl2.textContent='1';
   jumpDisplay2.style.display = isDual ? 'block' : 'none';
 
@@ -1142,6 +1202,20 @@ function reset(){
   running = true;
   lastT = performance.now();
   sEl.textContent = '0';
+
+  // Anime girl instant death
+  if(selectedShape==='anime'){
+    setTimeout(()=>{
+      if(running){
+        b1.alive=false;b1.mesh.visible=false;shake=2.0;
+        running=false;dead=true;
+        const msgs=['GO OUTSIDE','TOUCH GRASS','NOT TODAY','DENIED','GET REAL','TRY AGAIN (DON\'T)'];
+        fsEl.textContent=msgs[Math.floor(Math.random()*msgs.length)];
+        nbEl.style.display='none';
+        setTimeout(()=>{osEl.classList.remove('hide');osEl.classList.add('show');},300);
+      }
+    },150);
+  }
   if(!loopRunning){ loopRunning=true; requestAnimationFrame(loop); }
 }
 
@@ -1229,7 +1303,8 @@ function updateMovingObs(now){
 function updateBall(b, kl, kr, dt){
   if(!b.alive) return false;
   const dir = (kr?1:0) - (kl?1:0);
-  b.vx += dir * CFG.steer * dt;
+  const steerMult = (b.mesh.userData.shape==='turtle') ? 0.5 : 1.0;
+  b.vx += dir * CFG.steer * steerMult * dt;
   b.vx *= CFG.damp;
   b.px += b.vx * dt;
 
@@ -1342,6 +1417,19 @@ function updateBall(b, kl, kr, dt){
     b.mesh.rotation.x = 0;
     b.mesh.rotation.y = 0;
     b.mesh.rotation.z = -b.vx * 0.015;
+  } else if(sh==='turtle'){
+    // Slow waddle - gentle leg movement
+    const t = performance.now() * 0.002 * Math.min(2, Math.max(1, speed * 0.02));
+    const legs = b.mesh.userData.legs;
+    if(legs && legs.length===4){
+      legs[0].rotation.x = Math.sin(t) * 0.4;
+      legs[1].rotation.x = Math.sin(t + Math.PI) * 0.4;
+      legs[2].rotation.x = Math.sin(t + Math.PI) * 0.4;
+      legs[3].rotation.x = Math.sin(t) * 0.4;
+    }
+    b.mesh.rotation.x = 0;
+    b.mesh.rotation.y = 0;
+    b.mesh.rotation.z = -b.vx * 0.01;
   } else {
     // Default ball roll
     b.mesh.rotation.x -= speed * dt / (CFG.ballR * 3);
@@ -1351,15 +1439,16 @@ function updateBall(b, kl, kr, dt){
   // JUMP - per-ball jump handling with character multipliers
   // Cat: 2x height (sqrt(2) vel), Stickman: 0.6x height (sqrt(0.6) vel)
   const bShape = b.mesh.userData.shape;
+  const noJump = bShape==='turtle';
   const jmpMult = bShape==='cat' ? Math.sqrt(2) : bShape==='stickman' ? Math.sqrt(0.6) : 1.0;
-  if(b === b1 && jumpQueue > 0 && jumpsRemaining > 0){
+  if(b === b1 && jumpQueue > 0 && jumpsRemaining > 0 && !noJump){
     b.vy = JUMP_VEL * jmpMult;
     jumpsRemaining--;
     jumpQueue--;
     jumpCountEl.textContent = jumpsRemaining;
   }
   if(b === b1) jumpQueue = 0;
-  if(b === b2 && jumpQueue2 > 0 && jumpsRemaining2 > 0){
+  if(b === b2 && jumpQueue2 > 0 && jumpsRemaining2 > 0 && !noJump){
     b.vy = JUMP_VEL * jmpMult;
     jumpsRemaining2--;
     jumpQueue2--;
@@ -1381,7 +1470,7 @@ function loop(ts){
   if(running){
     syncKeys();
     // Character speed multiplier
-    const spdMult = selectedShape==='cat' ? 1.5 : selectedShape==='stickman' ? 0.7 : 1.0;
+    const spdMult = selectedShape==='cat' ? 1.5 : selectedShape==='stickman' ? 0.7 : selectedShape==='turtle' ? 0.4 : 1.0;
     speed += (CFG.spdUp + speed * 0.003) * 0.6 * spdMult * dt;
     dist += speed * dt;
 
@@ -1455,11 +1544,11 @@ function loop(ts){
     sEl.textContent = Math.floor(score);
     secEl.textContent = 'SECTION ' + sectionNum;
 
-    // Award a jump every 200 points
+    // Award a jump every 200 points (not for turtle)
     const milestone = Math.floor(score / 200);
     if(milestone > lastJumpMilestone){
       const bonus = milestone - lastJumpMilestone;
-      jumpsRemaining += bonus;
+      if(selectedShape!=='turtle') jumpsRemaining += bonus;
       jumpsRemaining2 += bonus;
       lastJumpMilestone = milestone;
       jumpCountEl.textContent = jumpsRemaining;
