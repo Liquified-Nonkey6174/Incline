@@ -300,7 +300,7 @@ function updateBallColor(bMesh, jumps){
     col=JUMP_COLORS[jumps];
   }
   bMesh.traverse(c=>{
-    if(c.material){
+    if(c.material && !c.userData.noTint){
       c.material.color.setHex(col);
       if(c.material.transparent) c.material.opacity=jumps>=5?0.4:0.2;
     }
@@ -592,10 +592,11 @@ function makeBallMesh(color, shape){
     // Load PNG as a billboard sprite
     const tex = new THREE.TextureLoader().load('anime.png');
     tex.encoding = THREE.sRGBEncoding;
-    const spriteMat = new THREE.SpriteMaterial({map:tex, transparent:true});
+    const spriteMat = new THREE.SpriteMaterial({map:tex, transparent:true, fog:false, color:0xffffff});
     const sprite = new THREE.Sprite(spriteMat);
     sprite.scale.set(R*3, R*3, 1);
     sprite.position.y = R*1.5;
+    sprite.userData.noTint = true;
     group.add(sprite);
     group.userData.shape='anime';
     return group;
