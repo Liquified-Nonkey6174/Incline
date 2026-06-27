@@ -1204,18 +1204,71 @@ function reset(){
   lastT = performance.now();
   sEl.textContent = '0';
 
-  // Anime girl instant death
+  // Anime girl glitch death sequence
   if(selectedShape==='anime'){
-    setTimeout(()=>{
-      if(running){
-        b1.alive=false;b1.mesh.visible=false;shake=2.0;
-        running=false;dead=true;
-        const msgs=['GO OUTSIDE','TOUCH GRASS','NOT TODAY','DENIED','GET REAL','TRY AGAIN (DON\'T)'];
+    let animeT=0, animeClones=[], animePhase=0;
+    const animeTex = b1.mesh.children[0]? b1.mesh.children[0].material.map : null;
+    function spawnClone(){
+      if(!animeTex) return;
+      const sm = new THREE.SpriteMaterial({map:animeTex, transparent:true, fog:false, color:0xffffff});
+      const sp = new THREE.Sprite(sm);
+      const s = CFG.ballR * (2 + Math.random()*3);
+      sp.scale.set(s, s, 1);
+      sp.position.set(
+        b1.mesh.position.x + (Math.random()-0.5)*12,
+        b1.mesh.position.y + Math.random()*8,
+        b1.mesh.position.z - Math.random()*20
+      );
+      scene.add(sp);
+      animeClones.push(sp);
+    }
+    const origPos = {x:0, y:0};
+    const animeLoop = setInterval(()=>{
+      animeT += 0.05;
+      if(animeT < 2){
+        // Phase 0: just sitting there, slight bob
+        b1.mesh.position.y = Math.sin(animeT*3)*0.1;
+      } else if(animeT < 4){
+        // Phase 1: shaking and glitching
+        b1.mesh.position.x = origPos.x + (Math.random()-0.5)*2;
+        b1.mesh.position.y = origPos.y + (Math.random()-0.5)*1.5;
+        if(b1.mesh.children[0]) b1.mesh.children[0].material.opacity = Math.random()>0.3 ? 1 : 0.2;
+      } else if(animeT < 7){
+        // Phase 2: teleporting + spawning clones
+        b1.mesh.position.x = (Math.random()-0.5)*10;
+        b1.mesh.position.y = Math.random()*5;
+        if(Math.random()<0.3) spawnClone();
+        // Shake existing clones
+        animeClones.forEach(c=>{
+          c.position.x += (Math.random()-0.5)*0.5;
+          c.position.y += (Math.random()-0.5)*0.3;
+        });
+      } else if(animeT < 10){
+        // Phase 3: rapid multiplication, covering screen
+        for(let i=0;i<3;i++) spawnClone();
+        b1.mesh.position.x = (Math.random()-0.5)*14;
+        b1.mesh.position.y = Math.random()*8 - 2;
+        // All clones jitter
+        animeClones.forEach(c=>{
+          c.position.x += (Math.random()-0.5)*1;
+          c.position.y += (Math.random()-0.5)*0.8;
+          const ns = c.scale.x * (1 + Math.random()*0.1);
+          c.scale.set(ns, ns, 1);
+        });
+      } else {
+        // Phase 4: clear everything
+        clearInterval(animeLoop);
+        b1.mesh.visible = false;
+        animeClones.forEach(c=>scene.remove(c));
+        animeClones = [];
+        shake = 3.0;
+        running = false; dead = true;
+        const msgs=['GO OUTSIDE','TOUCH GRASS','NOT TODAY','DENIED','GET REAL','TRY AGAIN (DON\'T)','SEEK HELP','GRASS. NOW.'];
         fsEl.textContent=msgs[Math.floor(Math.random()*msgs.length)];
         nbEl.style.display='none';
         setTimeout(()=>{osEl.classList.remove('hide');osEl.classList.add('show');},300);
       }
-    },150);
+    }, 50);
   }
   if(!loopRunning){ loopRunning=true; requestAnimationFrame(loop); }
 }
