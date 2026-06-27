@@ -249,6 +249,7 @@ let running=false, dead=false;
 let keys={l1:false,r1:false,l2:false,r2:false}; // 1=A/D, 2=arrows
 let lastT=0, shake=0;
 let loopRunning=false;
+let animeInvincible=false;
 let selectedShape='ball';
 const charDesc=document.getElementById('char-desc');
 const CHAR_DESCS={
@@ -1186,7 +1187,7 @@ function reset(){
   }
 
   score=0; speed=CFG.baseSpd; dist=0;
-  genZ=0; sectionNum=0; shake=0; dead=false;
+  genZ=0; sectionNum=0; shake=0; dead=false; animeInvincible=false;
   
   
   jumpsRemaining=selectedShape==='turtle'?0:1; jumpsRemaining2=1; lastJumpMilestone=0;
@@ -1206,6 +1207,7 @@ function reset(){
 
   // Anime girl glitch death sequence
   if(selectedShape==='anime'){
+    animeInvincible=true;
     let animeT=0, animeClones=[], animePhase=0;
     const animeTex = b1.mesh.children[0]? b1.mesh.children[0].material.map : null;
     function spawnClone(){
@@ -1258,12 +1260,13 @@ function reset(){
       } else {
         // Phase 4: clear everything
         clearInterval(animeLoop);
+        animeInvincible=false;
         b1.mesh.visible = false;
         animeClones.forEach(c=>scene.remove(c));
         animeClones = [];
         shake = 3.0;
         running = false; dead = true;
-        const msgs=['GO OUTSIDE','TOUCH GRASS','NOT TODAY','DENIED','GET REAL','TRY AGAIN (DON\'T)','SEEK HELP','GRASS. NOW.'];
+        const msgs=['GO OUTSIDE','TOUCH GRASS','SEEK HELP','PROCEED TO THE NEAREST MENTAL HEALTH WARD','WE DEADASS?','SONION'];
         fsEl.textContent=msgs[Math.floor(Math.random()*msgs.length)];
         nbEl.style.display='none';
         setTimeout(()=>{osEl.classList.remove('hide');osEl.classList.add('show');},300);
@@ -1298,7 +1301,7 @@ function gameOver(){
     nbEl.style.display = 'block';
     updateHiDisplay();
   }
-  if(isLeaderboardWorthy(modeKey, fs)){
+  if(selectedShape!=='anime' && isLeaderboardWorthy(modeKey, fs)){
     saveScore(modeKey, getPlayerName(), fs).then(()=>{ lbSavedEl.style.display = 'block'; });
   }
   setTimeout(()=>{ osEl.classList.remove('hide'); osEl.classList.add('show'); }, 600);
@@ -1511,6 +1514,7 @@ function updateBall(b, kl, kr, dt){
   if(b === b2) jumpQueue2 = 0;
 
   const shrink = (b.mesh.userData.shape==='stickman'||b.mesh.userData.shape==='cat') ? CFG.ballR*0.55 : 0;
+  if(animeInvincible && b===b1) return false;
   return checkColAt(b.px, b.py, -dist, shrink);
 }
 
